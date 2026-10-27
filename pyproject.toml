@@ -1,6 +1,6 @@
 [project]
 name = "tareas"
-version = "0.1.0"
+version = "1.0.0"
 description = "Automatiza tareas repetitivas con ficheros desde la terminal"
 readme = "README.md"
 authors = [
@@ -17,3 +17,8 @@ tareas = "tareas.cli:app"
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
