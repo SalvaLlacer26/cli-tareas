@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "acciones": [
+    {
+      "nombre": "apuntes-bases-dades",
+      "descripcion": "Mueve los apuntes de Bases de Datos a su carpeta, reconociendo la asignatura por el nombre del fichero.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp", ".odb", ".md", ".txt"],
+        "patron": "(?i)(sql|bbdd|mysql|mariadb|entitats|atributs|clau|relacional|esquema|biblioteca|model e-r)"
+      },
+      "destino": "~/Documents/Bases de dades"
+    },
+    {
+      "nombre": "apuntes-entorns",
+      "descripcion": "Mueve los apuntes de Entornos de Desarrollo a su carpeta, reconociendo la asignatura por el nombre del fichero.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
+        "patron": "(?i)(git|github|entorns|desenvolup|docker|versionat|repositori)"
+      },
+      "destino": "~/Documents/Entorns de desenrotllament"
+    },
+    {
+      "nombre": "apuntes-marcs",
+      "descripcion": "Mueve los apuntes de Lenguaje de Marcas a su carpeta, reconociendo la asignatura por el nombre del fichero.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
+        "patron": "(?i)(html|css|xml|figma|marques|màrqu|disseny|web)"
+      },
+      "destino": "~/Documents/Llenguatge_de_marques"
+    },
+    {
+      "nombre": "apuntes-programacio",
+      "descripcion": "Mueve los apuntes de Programación a su carpeta, reconociendo la asignatura por el nombre del fichero.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
+        "patron": "(?i)(python|java|programa|algorit|pseudocodi|funcions|bucles|llistes|c\\+\\+)"
+      },
+      "destino": "~/Documents/Programació"
+    },
+    {
+      "nombre": "apuntes-intermodular",
+      "descripcion": "Mueve los apuntes del Proyecto Intermodular a su carpeta, reconociendo la asignatura por el nombre del fichero.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
+        "patron": "(?i)(intermodular|projecte)"
+      },
+      "destino": "~/Documents/Projecte intermodular"
+    },
+    {
+      "nombre": "apuntes-sistemes",
+      "descripcion": "Mueve los apuntes de Sistemas Informáticos a su carpeta, reconociendo la asignatura por el nombre del fichero.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
+        "patron": "(?i)(linux|ubuntu|sistem|redes|maquinari|windows|virtualiz|servid|hardware)"
+      },
+      "destino": "~/Documents/Sistemes informàtics"
+    },
+    {
+      "nombre": "separar-instaladores",
+      "descripcion": "Aparta los instaladores de paquetes (.deb, .rpm, .exe…) a una subcarpeta para no estorbar en Descargas.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".deb", ".rpm", ".exe", ".msi", ".appimage"]
+      },
+      "destino": "~/Baixades/Instaladores"
+    },
+    {
+      "nombre": "separar-comprimidos",
+      "descripcion": "Aparta los ficheros comprimidos (.zip, .tar.xz…) a una subcarpeta para no estorbar en Descargas.",
+      "tipo": "mover",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".zip", ".tar.gz", ".tar.xz", ".7z", ".rar"]
+      },
+      "destino": "~/Baixades/Comprimidos"
+    },
+    {
+      "nombre": "renombrar-capturas",
+      "descripcion": "Renombra las capturas de pantalla y fotos con su fecha: 2026-10-27_001.png.",
+      "tipo": "renombrar",
+      "origen": "~/Imatges",
+      "filtro": {
+        "extensiones": [".png", ".jpg", ".jpeg", ".gif", ".webp"]
+      },
+      "plantilla": "{fecha:%Y-%m-%d}_{n:03}{ext}"
+    },
+    {
+      "nombre": "limpiar-temporales",
+      "descripcion": "Borra los ficheros temporales (.tmp) de Descargas que llevan más de 30 días sin tocarse.",
+      "tipo": "borrar",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".tmp"],
+        "mas_antiguo_que_dias": 30
+      },
+      "confirmar": true
+    },
+    {
+      "nombre": "copiar-copia-apuntes",
+      "descripcion": "Copia los apuntes de Descargas a una carpeta de copia de seguridad, sin tocar el original.",
+      "tipo": "copiar",
+      "origen": "~/Baixades",
+      "filtro": {
+        "extensiones": [".pdf", ".docx", ".odp"]
+      },
+      "destino": "~/Documents/Copia"
+    }
+  ]
+}
