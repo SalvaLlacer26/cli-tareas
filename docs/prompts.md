@@ -308,3 +308,82 @@ la misma familia: una excepción de la que nadie se encarga. Y la simulación
 debe ser **fiel**: si enseña un destino que luego no se usa, deja de servir
 para lo único que sirve.
 
+---
+
+## 2026-10-27 · Organizar y desorganizar la carpeta de descargas
+
+**Petición:** «cuando un archivo tenga un formato de nombre que no sea
+interpretable por el CLI, lo cambie y lo adapte para que sí lo sea», más dos
+órdenes: una que organice todo lo de la carpeta de descargas y otra que lo
+devuelva.
+
+**Prompt (agente plan):**
+
+> Quiero dos órdenes nuevas: `tareas organizar` y `tareas desorganizar`.
+> La primera reparte todo lo que hay en la carpeta de descargas entre las
+> carpetas de asignatura; la segunda lo devuelve. Al organizar, los nombres
+> que no sean interpretables se adaptan a un formato que sí lo sea.
+
+**Lo primero que hice fue mirar los datos, no escribir código.** En la carpeta
+de descargas había 13 PDF y, al lado, 13 ficheros `.md` con un resumen del
+contenido. Comparé qué.decía el nombre de cada fichero con qué decía su
+resumen, y salió esto:
+
+| Fichero | Por el nombre | Por el resumen |
+|---|---|---|
+| `P1.2. Activitats.pdf` | nada | **bbdd** («Introducció a les BBDD») |
+| `Activitat_PRI_01.pdf` | nada | **intermodular** («Projecte Intermodular 1DAW») |
+| `Salva_Llacer.pdf` | nada | **sistemes** («SISTEMES INFORMÀTICS») |
+| `A22_IntroduccióGit_2.pdf` | entorns | bbdd |
+
+Tres de los cuatro casos que no se entendían por el nombre **se entendían por
+el resumen**. Y el resumen son 2 KB de texto, frente a los PDF de varios
+megabytes. Esta es justo la optimización que planteé en el principio: leer lo
+barato, no lo caro.
+
+**Correcciones que hice al plan:**
+
+1. **La clasificación no puede ser «la primera que coincide».** Al principio
+   escribí que gana la primera carpeta cuyo patrón aparece. Al probarlo vi que
+   «Projecte Intermodular 1DAW» contiene «projecte» (intermodular) *y*
+   «github» (entornos), y se iba a entornos. Lo cambié por **puntuación**: gana
+   la carpeta con más patrones que aparecen. Con eso, intermodular gana 2-1.
+2. **El `.md` es un respaldo del PDF, no un fichero más.** Si no lo trato
+   aparte, se organizaría por su cuenta y acabaría con el nombre canónico
+   distinto al de su documento. Ahora se mueve con él.
+3. **Hacerlo reversible.** Si solo normalizo los nombres, desorganizar deja
+   los ficheros con el nombre canónico y el usuario ha perdido el suyo. Añadí
+   un manifiesto que recuerda de dónde salió cada fichero, así que la vuelta
+   los devuelve **exactamente** como estaban. Es la diferencia entre una
+   herramienta y un trasto.
+4. **La clave de la carpeta tiene que contar como patrón.** Si no, el nombre
+   nuevo (`bbdd_practica-1-entitats.pdf`) seguiría sin ser interpretable por
+   las acciones existentes, y todo el trabajo de normalizar sería inútil.
+
+**Lo que me salió mal:**
+
+- **La normalización no era idempotente.** `normalizar("bbdd_nota.pdf", "bbdd")`
+  devolvía `bbdd_bbdd-nota.pdf`, porque slugificaba el nombre entero (y el
+  guion bajo se convertía en guion) y luego le añadía la clave otra vez. Lo
+  detecté al escribir el test de idempotencia. Arreglo: quitar la clave del
+  nombre **antes** de normalizarlo.
+- **Un test mío daba por hecho que «P1.2. Activitats.pdf» iba a bbdd**, pero
+  sin el resumen no hay forma de saberlo: va a la carpeta de respaldo. El test
+  estaba mal, no el código. Lo reescribí para que compruebe las dos cosas.
+
+**Qué aprendí:**
+
+- Un nombre de fichero no es un dato: es una **etiqueta**, y las etiquetas se
+  pueden estandarizar. `Pràctica 1. Entitats, atributs i valors.pdf` → prefixo
+  de asignatura + nombre limpio. A partir de ahí el nombre dice de qué es el
+  fichero, y hasta las expresiones regulares que ya tenía escritas lo
+  entienden.
+- **La carpeta de asignaturas va en el fichero de configuración, no en el
+  código.** Las seis acciones `apuntes-*` heredan de la sección `carpetas`, así
+  que la asignatura se escribe una sola vez. Añadir una asignatura nueva es
+  añadir una entrada al JSON.
+- Lo que no se puede leer de un fichero pequeño, se lee de su resumen. Y lo
+  que no se puede saber de ningún sitio, se dice con claridad: la carpeta de
+  respaldo.
+
+

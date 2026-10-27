@@ -29,20 +29,68 @@ uv run tareas --help
 uv run pytest
 ```
 
-## Uso
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `tareas --help` | Ayuda general: todos los comandos y sus opciones. |
+| `tareas version` | Muestra la versión instalada (`tareas 1.0.0`). |
+| `tareas listar [CARPETA]` | Tabla con nombre, tipo, tamaño y fecha de cada fichero. Por defecto, la carpeta actual. |
+| `tareas acciones` | Lista las acciones definidas en `acciones.json` con su descripción, y las carpetas de destino. |
+| `tareas validar` | Comprueba `acciones.json` y dice exactamente qué campo falla. Sale con código 3 si está mal. |
+| `tareas ejecutar NOMBRE [CARPETA] --simular` | Ejecuta una acción. Con `--simular` enseña qué haría sin tocar nada. Con `--si` no pregunta. |
+| **`tareas organizar [CARPETA] --simular`** | **Reparte todo lo que hay en la carpeta de descargas entre las carpetas de asignatura, renombrando cada fichero a un formato que la herramienta entiende.** |
+| **`tareas desorganizar [CARPETA] --simular`** | **Deshace lo anterior: devuelve los ficheros clasificados a la carpeta de descargas con su nombre original.** |
+
+Las dos últimas son el ciclo completo:
 
 ```bash
-tareas --help                              # ayuda general
-tareas version                             # versión instalada
-tareas listar [CARPETA]                    # tabla: nombre, tipo, tamaño, fecha
-tareas acciones                            # acciones definidas en acciones.json
-tareas validar                             # comprueba acciones.json (código 3 si falla)
-tareas ejecutar NOMBRE [CARPETA] --simular # enseña qué haría, sin tocar nada
-tareas ejecutar NOMBRE [CARPETA] --si      # lo ejecuta sin preguntar
-tareas --config RUTA ...                   # otro fichero de acciones
+tareas organizar      --simular   # enseña qué haría
+tareas organizar                   # lo hace
+tareas desorganizar --simular      # y si te has equivocado, lo deshaces
 ```
 
-Códigos de salida: **0** bien · **1** fallo al ejecutar · **2** error de uso · **3** configuración inválida.
+### `tareas organizar`
+
+Reparte los ficheros de la carpeta de descargas (por defecto, la que dice
+`organizador.descargas` en `acciones.json`) entre las carpetas de asignatura.
+
+Para cada fichero:
+
+1. **Se busca la asignatura** por el nombre del fichero. Gana la carpeta con
+   **más** patrones que aparecen, no la primera que coincide: así
+   «Projecte Intermodular 1DAW» (que contiene «projecte» *y* «github») acaba en
+   intermodular y no en entornos.
+2. **Si el nombre no dice nada**, se mira el resumen de texto que va al lado
+   (`fichero.md`). Es un fichero de texto de un par de kilobytes, así que leerlo
+   es mucho más barato que abrir el PDF. `Salva_Llacer.pdf` no dice nada, pero
+   su resumen empieza con «SISTEMES INFORMÀTICS» y con eso se clasifica solo.
+3. **Si tampoco hay resumen**, el fichero va a la carpeta de respaldo
+   (`Sin clasificar`).
+4. **Se renombra** al formato canónico: `clave_asignatura` + nombre limpio.
+
+```
+Pràctica 1. Entitats, atributs i valors.pdf  ->  bbdd_practica-1-entitats-atributs-i-valors.pdf
+P1.2. Activitats.pdf                         ->  bbdd_p1-2-activitats.pdf
+Salva_Llacer.pdf                             ->  sistemes_salva-llacer.pdf
+Activitat_PRI_01.pdf                         ->  intermodular_activitat-pri-01.pdf
+```
+
+El resumen de texto (`fichero.md`) se mueve con su documento.
+
+**El nombre nuevo es interpretable**: como empieza por la clave de la
+asignatura, las acciones con patrón (`apuntes-bases-dades`, etc.) lo
+reconocen sin tocar nada. Es el ciclo completo: el nombre deja de ser un
+galimatías y pasa a decir de qué asignatura es el fichero.
+
+### `tareas desorganizar`
+
+Devuelve todos los ficheros de las carpetas de asignatura a la carpeta de
+descargas **con el nombre que tenían antes**. Para eso hay un manifiesto
+(`~/.local/state/tareas/manifiesto.json` en Linux) que recuerda de dónde salió
+cada fichero. Si el manifiesto no está, los ficheros vuelven igualmente, pero
+con el nombre normalizado.
+
 
 ## Spec (versión 1 · 2026-10-27)
 
@@ -64,6 +112,8 @@ Códigos de salida: **0** bien · **1** fallo al ejecutar · **2** error de uso 
 9. **Códigos de salida:** 0 bien · 1 fallo al ejecutar · 2 uso incorrecto · 3 configuración inválida.
 10. **Instalación:** `uv tool install --editable .`
 
+Códigos de salida: **0** bien · **1** fallo al ejecutar · **2** error de uso · **3** configuración inválida.
+
 ## Esquema de acciones.json
 
 `acciones.json` es la parte que escribo yo. El código solo trae el motor que lo
@@ -75,6 +125,28 @@ interpreta. Referencia completa de campos en [`docs/adr/0001-configuracion-exter
 |---|---|---|---|
 | `version` | sí | entero | Versión del esquema. Si cambia el formato, sube a 2. |
 | `acciones` | sí | lista | Las acciones. Vacía = error de configuración. |
+| `carpetas` | no | lista | Las carpetas de destino (asignaturas). Sin esta sección no hay nada que organizar. |
+| `organizador` | no | objeto | Dónde está la carpeta de descargas. |
+
+### `carpetas`: las asignaturas
+
+Cada carpeta es una asignatura. Es la fuente de verdad: la clave, el destino y
+los patrones se escriben **una sola vez**, y las acciones que apuntan a ella
+lo heredan.
+
+| Campo | Obligatorio | Tipo | Qué hace |
+|---|---|---|---|
+| `clave` | sí | texto | Identificador corto que se pone delante del nombre del fichero (`bbdd`, `sistemes`). Es lo que hace el nombre interpretable. |
+| `etiqueta` | no | texto | El nombre que ve la persona. Si falta, se usa la clave. |
+| `destino` | sí | ruta | La carpeta donde van los ficheros. Admite `~`. |
+| `patrones` | no | lista | Palabras o expresiones que señalan esa asignatura. Se cuentan, no se aplica el primero que coincida. |
+| `respaldo` | no | booleano | `true` en la carpeta que recibe lo que no se ha podido clasificar. |
+
+### `organizador`
+
+| Campo | Tipo | Qué hace |
+|---|---|---|
+| `descargas` | ruta | De dónde saca los ficheros `tareas organizar`. Admite `~`. |
 
 ### Cada acción
 
@@ -83,6 +155,7 @@ interpreta. Referencia completa de campos en [`docs/adr/0001-configuracion-exter
 | `nombre` | sí | texto | Lo que escribes en `tareas ejecutar NOMBRE`. Único, en minúsculas y con guiones. |
 | `descripcion` | sí | texto | Lo que enseña `tareas acciones`. Una frase para alguien que no eres tú. |
 | `tipo` | sí | `mover` \| `copiar` \| `renombrar` \| `borrar` | Qué clase de acción es. |
+| `carpeta` | no | texto | Clave de una carpeta de la sección «carpetas». La acción hereda su `destino` y sus `patrones`. |
 | `origen` | no | ruta | Carpeta por defecto si no pasas CARPETA en la orden. Admite `~`. |
 | `filtro` | no | objeto | Qué ficheros le afectan (ver más abajo). Sin filtro = todos. |
 | `destino` | `mover`/`copiar` | ruta | A dónde van. Si no existe, se crea al ejecutar de verdad. |
