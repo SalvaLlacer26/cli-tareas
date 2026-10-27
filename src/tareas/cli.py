@@ -17,7 +17,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from tareas import __version__
-from tareas.acciones import HECHO, SALTADO, SIMULADO, Resultado
+from tareas.acciones import ERROR, HECHO, SALTADO, SIMULADO, Resultado
 from tareas.config import cargar
 from tareas.errores import TareasError
 from tareas.motor import Motor
@@ -42,6 +42,24 @@ def tamano_legible(bytes: int) -> str:
         if tamano < 1024:
             break
     return f"{tamano:.1f} {unidad}"
+
+
+def ruta_legible(ruta: Path) -> str:
+    """Escribe la ruta con «~» en vez del directorio personal: es más corta."""
+    try:
+        return "~/" + str(ruta.resolve().relative_to(Path.home()))
+    except (ValueError, OSError, RuntimeError):
+        return str(ruta)
+
+
+def error_legible(exc: Exception) -> str:
+    """Prepara un mensaje de error para Rich, escapando el marcado.
+
+    Los mensajes llevan texto que escribe el usuario (nombres de fichero,
+    rutas), y Rich interpretaría sus corchetes como etiquetas.
+    """
+    return escape(str(exc))
+
 
 
 @app.callback()
@@ -77,7 +95,14 @@ def listar(
         )
         raise typer.Exit(code=1)
 
-    elementos = sorted(carpeta.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    try:
+        elementos = sorted(carpeta.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    except OSError as exc:
+        consola_err.print(
+            f"[red]Error:[/red] No puedo leer «{escape(str(carpeta))}»: {escape(str(exc.strerror or exc))}."
+        )
+        raise typer.Exit(code=1) from exc
+
     if not elementos:
         consola.print(f"La carpeta «{escape(str(carpeta))}» está vacía.")
         return
@@ -109,7 +134,7 @@ def acciones(ctx: typer.Context) -> None:
     try:
         definiciones = cargar(ctx.obj)
     except TareasError as exc:
-        consola_err.print(f"[red]Error:[/red] {exc}")
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     tabla = Table(title=f"Acciones de {escape(str(Path(ctx.obj).expanduser()))}")
@@ -134,10 +159,11 @@ def validar(ctx: typer.Context) -> None:
     try:
         definiciones = cargar(ctx.obj)
     except TareasError as exc:
-        consola_err.print(f"[red]Error:[/red] {exc}")
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     consola.print(f"[green]✔ {len(definiciones)} acción(es) válida(s).[/green]")
+
 
 
 @app.command()
@@ -164,11 +190,14 @@ def ejecutar(
     try:
         motor = Motor(cargar(ctx.obj))
         accion = motor.acciones.get(nombre)
-        if accion is not None and accion.destructiva and not simular and not si:
-            typer.confirm(f"«{nombre}» borra ficheros. ¿Seguro?", abort=True)
+        pide_confirmacion = accion is not None and (
+            accion.destructiva or accion.config.get("confirmar") is True
+        )
+        if pide_confirmacion and not simular and not si:
+            typer.confirm(f"«{escape(nombre)}» va a modificar ficheros. ¿Seguro?", abort=True)
         resultados = motor.ejecutar(nombre, carpeta, simular)
     except TareasError as exc:
-        consola_err.print(f"[red]Error:[/red] {exc}")
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     _pintar_resultados(nombre, resultados, simular)
@@ -177,33 +206,46 @@ def ejecutar(
 def _pintar_resultados(nombre: str, resultados: list[Resultado], simular: bool) -> None:
     """Pinta la tabla de resultados y el resumen de la ejecución."""
     titulo = (
-        f"{nombre} (SIMULACIÓN: no se ha tocado nada)"
+        f"{escape(nombre)} (SIMULACIÓN: no se ha tocado nada)"
         if simular
-        else nombre
+        else escape(nombre)
     )
     tabla = Table(title=titulo)
     tabla.add_column("Fichero")
     tabla.add_column("Destino")
     tabla.add_column("Estado")
 
+    errores: list[Resultado] = []
     for resultado in resultados:
-        destino = escape(str(resultado.destino)) if resultado.destino else "—"
-        tabla.add_row(escape(resultado.origen.name), destino, resultado.estado)
+        if resultado.destino is not None:
+            destino = escape(ruta_legible(resultado.destino))
+        else:
+            destino = "—"
+        estado = resultado.estado
+        if resultado.estado == ERROR:
+            estado = f"[red]error: {escape(resultado.error or '')}[/red]"
+            errores.append(resultado)
+        tabla.add_row(escape(resultado.origen.name), destino, estado)
 
     if resultados:
         consola.print(tabla)
     else:
-        consola.print(f"La acción «{nombre}» no ha encontrado ningún fichero.")
+        consola.print(f"La acción «{escape(nombre)}» no ha encontrado ningún fichero.")
 
     hechos = sum(1 for r in resultados if r.estado == HECHO)
     simulados = sum(1 for r in resultados if r.estado == SIMULADO)
     saltados = sum(1 for r in resultados if r.estado == SALTADO)
     consola.print(
-        f"{len(resultados)} fichero(s) · {hechos} hecho(s) · {simulados} simulado(s) · {saltados} saltado(s)"
+        f"{len(resultados)} fichero(s) · {hechos} hecho(s) · {simulados} simulado(s) "
+        f"· {saltados} saltado(s) · {len(errores)} error(es)"
     )
 
     if simular:
         consola.print("Para hacerlo de verdad, repite la orden sin --simular.")
+
+    if errores:
+        raise typer.Exit(code=1)
+
 
 
 if __name__ == "__main__":  # pragma: no cover

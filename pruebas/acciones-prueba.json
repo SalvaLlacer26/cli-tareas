@@ -8,7 +8,7 @@
       "origen": "~/pruebas-tareas/Descargas",
       "filtro": {
         "extensiones": [".pdf", ".docx", ".odp", ".odb", ".md", ".txt"],
-        "patron": "(?i)(sql|bbdd|mysql|mariadb|entitats|atributs|clau|relacional|esquema|biblioteca|model e-r)"
+        "patron": "(sql|bbdd|mysql|mariadb|entitats|atributs|clau|relacional|esquema|biblioteca|model e-r)"
       },
       "destino": "~/pruebas-tareas/Documents/Bases de dades"
     },
@@ -19,7 +19,7 @@
       "origen": "~/pruebas-tareas/Descargas",
       "filtro": {
         "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(?i)(git|github|entorns|desenvolup|docker|versionat|repositori)"
+        "patron": "(git|github|entorns|desenvolup|docker|versionat|repositori)"
       },
       "destino": "~/pruebas-tareas/Documents/Entorns de desenrotllament"
     },
@@ -30,7 +30,7 @@
       "origen": "~/pruebas-tareas/Descargas",
       "filtro": {
         "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(?i)(html|css|xml|figma|marques|màrqu|disseny|web)"
+        "patron": "(html|css|xml|figma|marques|màrqu|disseny|web)"
       },
       "destino": "~/pruebas-tareas/Documents/Llenguatge_de_marques"
     },
@@ -41,7 +41,7 @@
       "origen": "~/pruebas-tareas/Descargas",
       "filtro": {
         "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(?i)(python|java|programa|algorit|pseudocodi|funcions|bucles|llistes|c\\+\\+)"
+        "patron": "(python|java|programa|algorit|pseudocodi|funcions|bucles|llistes|c\\+\\+)"
       },
       "destino": "~/pruebas-tareas/Documents/Programació"
     },
@@ -52,7 +52,7 @@
       "origen": "~/pruebas-tareas/Descargas",
       "filtro": {
         "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(?i)(intermodular|projecte)"
+        "patron": "(intermodular|projecte)"
       },
       "destino": "~/pruebas-tareas/Documents/Projecte intermodular"
     },
@@ -63,7 +63,7 @@
       "origen": "~/pruebas-tareas/Descargas",
       "filtro": {
         "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(?i)(linux|ubuntu|sistem|redes|maquinari|windows|virtualiz|servid|hardware)"
+        "patron": "(linux|ubuntu|sistem|redes|maquinari|windows|virtualiz|servid|hardware)"
       },
       "destino": "~/pruebas-tareas/Documents/Sistemes informàtics"
     },
