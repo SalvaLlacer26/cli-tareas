@@ -15,11 +15,18 @@ uv python install 3.12
 uv tool install --editable .
 ```
 
+Para instalarla desde el repo, sin clonarlo:
+
+```bash
+uv tool install git+https://github.com/SalvaLlacer26/cli-tareas
+```
+
 Para desarrollar (recarga los cambios al instante):
 
 ```bash
 uv sync
 uv run tareas --help
+uv run pytest
 ```
 
 ## Uso
