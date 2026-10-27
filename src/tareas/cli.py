@@ -18,9 +18,10 @@ from rich.table import Table
 
 from tareas import __version__
 from tareas.acciones import ERROR, HECHO, SALTADO, SIMULADO, Resultado
-from tareas.config import cargar
+from tareas.config import cargar, cargar_config
 from tareas.errores import TareasError
 from tareas.motor import Motor
+from tareas.organizador import Desorganizador, Organizador
 
 app = typer.Typer(
     help="tareas: automatiza tareas repetitivas con tus ficheros.",
@@ -201,6 +202,144 @@ def ejecutar(
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     _pintar_resultados(nombre, resultados, simular)
+
+
+@app.command()
+def organizar(
+    ctx: typer.Context,
+    carpeta: Annotated[
+        Path | None,
+        typer.Argument(help="Carpeta que hay que organizar (por defecto, la de descargas del config)."),
+    ] = None,
+    simular: Annotated[
+        bool,
+        typer.Option("--simular", help="Enseña qué haría sin tocar nada."),
+    ] = False,
+    si: Annotated[
+        bool,
+        typer.Option("--si", help="No pedir confirmación."),
+    ] = False,
+) -> None:
+    """Reparte los ficheros de una carpeta entre las carpetas de asignatura.
+
+    Cada fichero se renombra a un formato que la herramienta entiende
+    (prefijo de la asignatura + nombre limpio) y se mueve a su carpeta. Si el
+    nombre no dice a qué asignatura pertenece, se mira el resumen de texto
+    que va al lado; si tampoco, el fichero va a la carpeta de respaldo.
+    """
+    try:
+        configuracion = cargar_config(ctx.obj)
+        if not configuracion.carpetas:
+            raise TareasError(
+                "El fichero de acciones no tiene la sección «carpetas», así que no hay "
+                "nada a lo que organizar. Mira el README para ver cómo se escribe."
+            )
+        origen = carpeta if carpeta is not None else configuracion.descargas
+        if not simular and not si:
+            typer.confirm(
+                f"«{escape(str(origen))}» se va a vaciar en las carpetas de asignatura. ¿Seguro?",
+                abort=True,
+            )
+        organizador = Organizador(configuracion.carpetas)
+        resultados = organizador.organizar(origen, simular)
+    except TareasError as exc:
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
+        raise typer.Exit(code=exc.codigo_salida) from exc
+
+    _pintar_organizacion("organizar", resultados, simular, ("Fichero", "Carpeta", "Nombre nuevo"))
+
+
+@app.command()
+def desorganizar(
+    ctx: typer.Context,
+    carpeta: Annotated[
+        Path | None,
+        typer.Argument(help="Carpeta donde dejar los ficheros (por defecto, la de descargas del config)."),
+    ] = None,
+    simular: Annotated[
+        bool,
+        typer.Option("--simular", help="Enseña qué haría sin tocar nada."),
+    ] = False,
+    si: Annotated[
+        bool,
+        typer.Option("--si", help="No pedir confirmación."),
+    ] = False,
+) -> None:
+    """Devuelve a la carpeta de descargas los ficheros ya clasificados.
+
+    Deshace lo que hizo «tareas organizar»: cada fichero vuelve a su sitio
+    con el nombre que tenía antes.
+    """
+    try:
+        configuracion = cargar_config(ctx.obj)
+        if not configuracion.carpetas:
+            raise TareasError(
+                "El fichero de acciones no tiene la sección «carpetas», así que no hay "
+                "nada que devolver. Mira el README para ver cómo se escribe."
+            )
+        destino = carpeta if carpeta is not None else configuracion.descargas
+        if not simular and not si:
+            typer.confirm(
+                f"Las carpetas de asignatura se van a vaciar en «{escape(str(destino))}». ¿Seguro?",
+                abort=True,
+            )
+        desorganizador = Desorganizador(configuracion.carpetas)
+        resultados = desorganizador.desorganizar(destino, simular)
+    except TareasError as exc:
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
+        raise typer.Exit(code=exc.codigo_salida) from exc
+
+    _pintar_organizacion("desorganizar", resultados, simular, ("Fichero", "Carpeta", "Nombre original"))
+
+
+def _pintar_organizacion(
+    titulo: str,
+    resultados: list[Resultado],
+    simular: bool,
+    cabeceras: tuple[str, str, str],
+) -> None:
+    """Pinta la tabla del organizador: fichero, carpeta y nombre final.
+
+    Es más legible que la tabla genérica: aquí lo interesante es a qué carpeta
+    va cada fichero y cómo se queda su nombre, no la ruta entera.
+    """
+    if not resultados:
+        consola.print("No hay ningún fichero que organizar.")
+        return
+
+    tabla = Table(
+        title=f"{escape(titulo)} (SIMULACIÓN: no se ha tocado nada)" if simular else escape(titulo)
+    )
+    tabla.add_column(cabeceras[0])
+    tabla.add_column(cabeceras[1])
+    tabla.add_column(cabeceras[2])
+    tabla.add_column("Estado")
+
+    errores = 0
+    for resultado in resultados:
+        carpeta = resultado.destino.parent.name if resultado.destino else "—"
+        nombre = resultado.destino.name if resultado.destino else "—"
+        estado = resultado.estado
+        if resultado.estado == ERROR:
+            estado = f"[red]error: {escape(resultado.error or '')}[/red]"
+            errores += 1
+        tabla.add_row(
+            escape(resultado.origen.name),
+            escape(carpeta),
+            escape(nombre),
+            estado,
+        )
+
+    consola.print(tabla)
+    hechos = sum(1 for r in resultados if r.estado == HECHO)
+    simulados = sum(1 for r in resultados if r.estado == SIMULADO)
+    saltados = sum(1 for r in resultados if r.estado == SALTADO)
+    consola.print(
+        f"{len(resultados)} fichero(s) · {hechos} hecho(s) · {simulados} simulado(s) "
+        f"· {saltados} saltado(s) · {errores} error(es)"
+    )
+    if simular:
+        consola.print("Para hacerlo de verdad, repite la orden sin --simular.")
 
 
 def _pintar_resultados(nombre: str, resultados: list[Resultado], simular: bool) -> None:
