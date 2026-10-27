@@ -6,6 +6,44 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v1.1.0] — 2026-10-27
+
+Ahora la herramienta **organiza la carpeta de descargas entera con una orden**
+y sabe **deshacerlo** con otra. Y renombra los ficheros a un formato que la
+propia herramienta entiende.
+
+### Añadido
+
+- **`tareas organizar [CARPETA] --simular`**: reparte todo lo que hay en la
+  carpeta de descargas entre las carpetas de asignatura. Decide la asignatura
+  por el nombre del fichero; si el nombre no dice nada, mira el resumen de
+  texto que va al lado (`.md`), que es mucho más barato de leer que el PDF; y
+  si tampoco hay resumen, lo manda a la carpeta de respaldo.
+- **`tareas desorganizar [CARPETA] --simular`**: deshace lo anterior y devuelve
+  los ficheros a la carpeta de descargas **con su nombre original**, gracias al
+  manifiesto que recuerda de dónde salió cada uno.
+- **Nombres canónicos**: `Pràctica 1. Entitats, atributs i valors.pdf` pasa a
+  llamarse `bbdd_practica-1-entitats-atributs-i-valors.pdf`. El prefijo es la
+  clave de la asignatura, así que el nombre **sí dice de qué es el fichero** y
+  las acciones con patrón lo reconocen sin tocar nada.
+- **Sección `carpetas` en `acciones.json`**: las asignaturas se describen una
+  sola vez (clave, etiqueta, destino y patrones) y las acciones que apuntan a
+  ellas heredan su destino y sus patrones. Añadir una asignatura es añadir una
+  entrada, sin tocar código.
+- **Clasificación por puntuación**: gana la carpeta con **más** patrones que
+  aparecen, no la primera que coincide. «Projecte Intermodular 1DAW» va a
+  intermodular aunque también mentione «github».
+- **Manifiesto** en la carpeta de estado del usuario (`platformdirs` la calcula
+  bien en Linux, Windows y macOS), que hace que el viaje de ida y vuelta no
+  pierda ni un nombre.
+- **16 pruebas nuevas** (63 en total) sobre la normalización de nombres, la
+  clasificación, el ciclo completo de ida y vuelta y el manifiesto.
+
+### Corregido
+
+- `normalizar` duplicaba la clave cuando el nombre ya la tenía delante
+  (`bbdd_bbdd-nota.pdf`). Ahora normalizar dos veces no cambia nada.
+
 ## [v1.0.0] — 2026-10-27
 
 Primera versión estable. La herramienta se instala con una orden, valida su
