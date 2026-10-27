@@ -26,3 +26,16 @@ class AccionNoValida(ConfigError):
         self.accion = accion
         self.campo = campo
         self.motivo = motivo
+
+
+class CarpetaNoValida(ConfigError):
+    """La sección «carpetas» del fichero de acciones está mal.
+
+    Es un error de configuración, así que sale con código 3, como los demás.
+    """
+
+    def __init__(self, carpeta: str, campo: str, motivo: str) -> None:
+        super().__init__(f"Carpeta «{carpeta}», campo «{campo}»: {motivo}")
+        self.carpeta = carpeta
+        self.campo = campo
+        self.motivo = motivo
