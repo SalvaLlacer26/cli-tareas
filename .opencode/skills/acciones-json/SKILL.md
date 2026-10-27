@@ -25,13 +25,23 @@ description: Reglas del fichero acciones.json de la CLI tareas (campos, tipos, f
   con `filtro.patron`. Es deliberado: si el nombre no dice nada, el fichero no se mueve.
   Si el nombre dice algo, el fichero no se mueve; se queda en Descargas.
 - `origen` y `destino` admiten `~`; se expanden con `Path.expanduser()`.
-- Los patrones van con el flag `(?i)` al principio para que no importen las mayúsculas.
+- Los patrones no necesitan el flag `(?i)`: el motor los compila con `re.IGNORECASE`.
 - En JSON, la barra invertida se escribe doble: `c\\+\\+` para buscar `c++`.
 
 ## Trampas conocidas
 
-- `patron` se evalúa sobre el **nombre completo** del fichero, con la extensión.
+- `patron` se evalúa sobre el **nombre completo** del fichero, con la extensión,
+  y **sin distinguir mayúsculas** (el motor lo compila con `re.IGNORECASE`).
+  No hace falta escribir `(?i)`.
 - Los filtros se combinan con Y: un fichero tiene que cumplir **todos** los que pongas.
+- `extensiones` se comparan por sufijo del nombre, así que `".tar.gz"` sí funciona
+  (con `Path.suffix` solo se vería `".gz"`).
 - `mayor_que_mb` compara con `>=` el tamaño en MB; `mas_antiguo_que_dias` mira la fecha
   de **modificación**, no la de creación.
 - `borrar` no admite `confirmar: false`: `config.py` lo rechaza a propósito.
+- El filtro **no baja a las subcarpetas**: solo mira el primer nivel.
+- Los campos que la acción reconoce son una lista blanca (`nombre`, `descripcion`,
+  `tipo`, `origen`, `filtro`, `destino`, `plantilla`, `confirmar`). Escribir
+  `patron` fuera de `filtro` es un error de configuración, no un descuido: si
+  pasara, la acción se aplicaría a todos los ficheros de la carpeta.
+

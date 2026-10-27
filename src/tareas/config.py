@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 from .errores import AccionNoValida, ConfigError
@@ -28,11 +29,26 @@ DESTRUCTIVAS = ("borrar",)
 #: Claves que se admiten dentro de «filtro».
 CLAVES_FILTRO = ("extensiones", "patron", "mas_antiguo_que_dias", "mayor_que_mb")
 
+#: Campos que se admiten en una acción. Lo que no esté aquí es un error:
+#: escribir «patron» fuera de «filtro» haría que la acción se aplicase a todo.
+CLAVES_ACCION = ("nombre", "descripcion", "tipo", "origen", "filtro", "destino", "plantilla", "confirmar")
+
 #: Huecos que la plantilla de renombrar puede usar.
 HUECOS_PLANTILLA = ("fecha", "n", "ext", "nombre")
 
+#: Caracteres que Windows no admite en un nombre de fichero.
+CARACTERES_INVALIDOS = '<>:"/\\|?*'
+
+#: Nombres que Windows reserva y no puede usar.
+NOMBRES_RESERVADOS = (
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+)
+
 #: Formato obligatorio del campo «nombre».
 RE_NOMBRE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
 
 
 def cargar(ruta: Path) -> list[dict]:
@@ -49,7 +65,13 @@ def cargar(ruta: Path) -> list[dict]:
         )
 
     try:
-        texto = ruta.read_text(encoding="utf-8")
+        # utf-8-sig lee igual con BOM que sin BOM: el Bloc de notas de Windows
+        # guarda en UTF-8 con BOM y sin él el JSON parecería roto.
+        texto = ruta.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ConfigError(
+            f"«{ruta.name}» no está guardado en UTF-8. Vuelve a guardarlo con esa codificación."
+        ) from exc
     except OSError as exc:
         raise ConfigError(f"No puedo leer «{ruta}»: {exc.strerror or exc}.") from exc
 
@@ -108,6 +130,15 @@ def _validar_accion(accion: object, posicion: int, vistas: set[str]) -> dict:
         raise AccionNoValida(nombre, "nombre", "está repetido")
     vistas.add(nombre)
 
+    desconocidas = set(accion) - set(CLAVES_ACCION)
+    if desconocidas:
+        raise AccionNoValida(
+            nombre,
+            "claves",
+            f"tiene campos que no existen ({', '.join(sorted(desconocidas))}); "
+            f"los válidos son: {', '.join(CLAVES_ACCION)}",
+        )
+
     descripcion = accion["descripcion"]
     if not isinstance(descripcion, str) or not descripcion.strip():
         raise AccionNoValida(nombre, "descripcion", "debe ser un texto que explique qué hace")
@@ -117,6 +148,9 @@ def _validar_accion(accion: object, posicion: int, vistas: set[str]) -> dict:
         raise AccionNoValida(
             nombre, "tipo", f"«{tipo}» no existe; usa uno de: {', '.join(TIPOS)}"
         )
+
+    if "origen" in accion and not isinstance(accion["origen"], str):
+        raise AccionNoValida(nombre, "origen", "debe ser una ruta (admite ~)")
 
     extra = POR_TIPO.get(tipo)
     if extra and not accion.get(extra):
@@ -145,7 +179,14 @@ def _validar_plantilla(nombre: str, plantilla: object) -> None:
     if not isinstance(plantilla, str) or not plantilla.strip():
         raise AccionNoValida(nombre, "plantilla", "debe ser un texto no vacío")
 
-    from datetime import datetime
+    separadores = [c for c in ("/", "\\") if c in plantilla]
+    if separadores:
+        raise AccionNoValida(
+            nombre,
+            "plantilla",
+            "no puede contener barras: el nombre nuevo tiene que ser un solo fichero, "
+            "no una ruta",
+        )
 
     valores = {
         "fecha": datetime(2026, 1, 1),
@@ -154,7 +195,7 @@ def _validar_plantilla(nombre: str, plantilla: object) -> None:
         "nombre": "fichero",
     }
     try:
-        plantilla.format(**valores)
+        resultado = plantilla.format(**valores)
     except KeyError as exc:
         hueco = str(exc).split("'")[1] if "'" in str(exc) else exc
         raise AccionNoValida(
@@ -165,6 +206,9 @@ def _validar_plantilla(nombre: str, plantilla: object) -> None:
         ) from exc
     except (IndexError, ValueError) as exc:
         raise AccionNoValida(nombre, "plantilla", f"el formato no es válido: {exc}") from exc
+
+    if not resultado.strip():
+        raise AccionNoValida(nombre, "plantilla", "el nombre nuevo no puede quedar vacío")
 
 
 def _validar_filtro(nombre: str, filtro: object) -> None:
@@ -209,3 +253,22 @@ def _validar_filtro(nombre: str, filtro: object) -> None:
             continue
         if not isinstance(valor, int) or isinstance(valor, bool) or valor < 0:
             raise AccionNoValida(nombre, f"filtro.{campo}", "debe ser un número entero de 0 o más")
+
+
+def problema_nombre(nombre: str) -> str | None:
+    """Devuelve el motivo por el que un nombre no vale, o None si vale.
+
+    Se comprueba contra las reglas de Windows, que son las más estrictas: un
+    nombre válido en Linux puede ser inválido en el portátil de un compañero.
+    """
+    if not nombre.strip():
+        return "el nombre no puede quedar vacío"
+    if nombre in (".", ".."):
+        return "no puede ser «.» ni «..»"
+    if any(c in CARACTERES_INVALIDOS for c in nombre):
+        return f"no puede llevar ninguno de estos caracteres: {CARACTERES_INVALIDOS}"
+    if nombre.split(".")[0].upper() in NOMBRES_RESERVADOS:
+        return f"«{nombre.split('.')[0]}» es un nombre que Windows reserva"
+    if nombre.endswith(" ") or nombre.endswith("."):
+        return "no puede terminar en espacio ni en punto"
+    return None

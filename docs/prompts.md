@@ -217,3 +217,94 @@ temporales viejos y copiar una copia de seguridad de los apuntes.
 `filtro.patron` es un «buscador con destino». Encadenarlas (primero separar
 instaladores, luego repartir apuntes) es lo que da a la herramienta el
 comportamiento de «combinables» que pide la rúbrica.
+
+---
+
+## 2026-10-27 · Revisión con @revisor: 10 fallos reales
+
+Antes de dar el proyecto por bueno, lancé el subagente revisor sobre
+`src/tareas/`. No se quedó en comentarios de estilo: encontró diez fallos
+reales, y casi todos eran **excepciones sin capturar que llegaban al usuario
+como una traza de Python**. Eso es justo lo que la rúbrica penaliza.
+
+**Prompt:**
+
+> @revisor revisa @src/tareas/
+
+**Lo que señaló, y lo que hice:**
+
+1. **`UnicodeDecodeError` al leer `acciones.json`.** `read_text(encoding="utf-8")`
+   solo captura `OSError`, y `UnicodeDecodeError` es un `ValueError`. Si el
+   JSON estaba en latin-1 (el «ANSI» de Windows), el usuario veía una traza.
+   Ahora se lee con `utf-8-sig` y se avisa: «no está guardado en UTF-8».
+   De paso, `utf-8-sig` también arregla el **BOM** del Bloc de notas de
+   Windows, que hacía que un JSON perfectamente válido pareciera roto.
+2. **`AttributeError` con `"filtro": null`.** La validación aceptaba un filtro
+   nulo, pero `config.get("filtro", {})` devuelve `None` cuando la clave
+   **existe** con valor `null` (el valor por defecto solo se aplica si falta
+   la clave). Arreglado con `or {}`.
+3. **`TypeError` con `"origen": 123`.** `origen` no se validaba en absoluto y
+   el motor hacía `Path(origen)`. Ahora `config.py` comprueba que sea un texto.
+4. **`ValueError: Invalid name` con `"plantilla": "sub/{n}.txt"`.** La
+   plantilla pasaba la validación y reventaba al renombrar, porque el nombre
+   nuevo no puede ser una ruta. Ahora la plantilla no puede llevar barras.
+5. **`MarkupError` de Rich.** Los mensajes de error metían texto del usuario
+   sin escapar, así que un fichero llamado `[/].pdf` hacía que Rich protestara
+   con un `MarkupError` en vez de decir qué pasaba. Ahora todo lo que viene
+   del usuario pasa por `escape()`.
+6. **`PermissionError` al leer la carpeta.** `listar` lo controlaba, pero el
+   motor no: una carpeta sin permisos lancía la traza.
+7. **`FileNotFoundError` en `stat()`.** Si el fichero se borra entre el
+   `iterdir()` y el `stat()` —cosa normal en `~/Baixades` mientras descargas
+   algo— la acción reventaba. Ahora se salta ese fichero.
+8. **`OSError` al mover, copiar, renombrar o borrar.** Destino sin permiso,
+   fichero bloqueado en Windows, disco lleno. Y lo peor: como `ejecutar` era
+   una comprensión de listas, **un solo fallo abortaba la acción entera**,
+   dejando los ficheros anteriores ya movidos y sin tabla de resultados. Ahora
+   cada fichero se captura por separado, se anota el error y se sigue; el
+   programa sale con código 1 al final.
+9. **`RuntimeError` de `expanduser()`** si no se puede resolver `~`.
+10. **La simulación mentía.** `destino_libre` decide mirando el disco, y en
+    simulación el disco no cambia: dos ficheros que se renombraban al mismo
+    nombre **mostraban el mismo destino**, cuando de verdad el segundo habría
+    acabado en « (1)». Justo al revés de lo que sirve una simulación. Ahora la
+    acción lleva un conjunto de nombres ya reservados, así que la simulación
+    enseña exactamente los destinos reales.
+
+**Unos más que también arreglé:**
+
+- **La extensión `.tar.gz` nunca entraba.** `Path("informe.tar.gz").suffix` es
+  `".gz"`, así que mi propia acción `separar-comprimidos` pedía `".tar.gz"` y
+  `".tar.xz"` y esos ficheros jamás se habrían movido. Ahora se comparan las
+  extensiones por sufijo del **nombre**, no con `Path.suffix`.
+- **La regex no distinguía mayúsculas, pero las extensiones sí.** Era
+  incoherente: `factura.PDF` entraba en `.pdf` pero `Informe.pdf` no entraba
+  en el patrón `informe`. Ahora el motor compila el patrón con
+  `re.IGNORECASE` y he quitado el `(?i)` de los seis patrones del JSON, que
+  era redundante.
+- **Un campo desconocido en una acción pasaba desapercibido.** Si escribías
+  `"patron"` en vez de dentro de `"filtro"`, la validación lo aceptaba y la
+  acción se aplicaba a **todos** los ficheros de la carpeta. Con `tipo:
+  "borrar"` eso es borrar de más. Ahora hay una lista blanca de campos por
+  acción.
+- **`confirmar` era un campo muerto.** La documentación lo describía, pero el código solo miraba `destructiva`. Ahora una acción con `"confirmar": true` también pregunta.
+- **Los enlaces simbólicos rotos.** `destino.exists()` sigue los enlaces, así
+  que un enlace roto en el destino devolvía `False` y `shutil.copy2`
+  escribía **a través** del enlace, machacando el fichero al que apuntaba
+  (que puede estar en cualquier sitio). Ahora `destino_libre` cuenta los
+  enlaces rotos como destino ocupado.
+- **Nombres que Windows no admite.** `CON.txt`, `LPT1.txt` o un nombre con
+  `:` son válidos en Linux y reventan en el portátil de un compañero. Ahora
+  `config.py` los rechaza con un mensaje claro.
+
+**Lo que el revisor se equivocó en:** dijo que el código de salida de una
+acción inexistente debería ser 2 (error de uso). No es así: el enunciado dice
+que «acción desconocida» es un 1 (fallo al ejecutar), y el 2 lo pone Typer
+solo cuando el uso de la orden es incorrecto.
+
+**Qué aprendí:** un programa que borra ficheros no puede fiarse ni de los
+ficheros ni del disco. Casi todos los fallos que encontró el revisor eran de
+la misma familia: una excepción de la que nadie se encarga. Y la simulación
+debe ser **fiel**: si enseña un destino que luego no se usa, deja de servir
+para lo único que sirve.
+

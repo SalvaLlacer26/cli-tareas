@@ -80,7 +80,7 @@ interpreta. Referencia completa de campos en [`docs/adr/0001-configuracion-exter
 | `filtro` | no | objeto | Qué ficheros le afectan (ver más abajo). Sin filtro = todos. |
 | `destino` | `mover`/`copiar` | ruta | A dónde van. Si no existe, se crea al ejecutar de verdad. |
 | `plantilla` | `renombrar` | texto | El nombre nuevo (ver huecos más abajo). |
-| `confirmar` | `borrar` | booleano | `true` pide confirmación salvo que passes `--si`. |
+| `confirmar` | `borrar` | booleano | `true` pide confirmación antes de actuar, salvo que pases `--si`. Las acciones de tipo `borrar` siempre piden confirmación: no se puede desactivar. |
 
 ### Filtros (dentro de `filtro`)
 
@@ -88,10 +88,12 @@ Si pones varios, el fichero tiene que cumplirlos **todos**.
 
 | Campo | Tipo | Qué hace |
 |---|---|---|
-| `extensiones` | lista | Solo esas extensiones, comparadas en minúsculas (`FOTO.JPG` entra en `.jpg`). |
-| `patron` | regex | Expresión regular sobre el nombre del fichero. En JSON la `\` se escribe `\\`. |
+| `extensiones` | lista | Solo esas extensiones, comparadas en minúsculas (`FOTO.JPG` entra en `.jpg`). Se comparan por sufijo del nombre, así que `".tar.gz"` también funciona. |
+| `patron` | regex | Expresión regular sobre el nombre del fichero, **sin distinguir mayúsculas**. En JSON la `\` se escribe `\\`. |
 | `mas_antiguo_que_dias` | entero | Solo ficheros modificados hace más de N días. |
 | `mayor_que_mb` | entero | Solo ficheros de más de N MB. |
+
+El filtro **no baja a las subcarpetas**: solo mira el primer nivel de la carpeta.
 
 ### Huecos de `plantilla` (para `renombrar`)
 
@@ -164,6 +166,27 @@ resto. Se queda en el repo como prueba de por dónde empezó la herramienta.
 
 - `.env` está en `.gitignore` desde el primer commit. Ninguna clave en el repo.
 - Las acciones destructivas (`borrar`) piden confirmación salvo `--si`.
-- `--simular` no toca el disco: ni mueve, ni copia, ni crea carpetas.
+- `--simular` no toca el disco: ni mueve, ni copia, ni crea carpetas. Y la
+  simulación enseña **exactamente** el mismo destino que la ejecución real,
+  incluidos los sufijos « (1)» cuando dos ficheros acabarían con el mismo nombre.
 - Nunca se sobrescribe un fichero: si el destino existe, se añade ` (1)`, ` (2)`…
+  Ni siquiera a través de un enlace simbólico roto.
+- Un fichero que falla no corta la acción: se anota el error, se sigue con los
+  demás y el programa sale con código 1.
 - Prueba siempre en `~/pruebas-tareas`, nunca sobre tus carpetas reales.
+  Con `--config pruebas/acciones-prueba.json` todas las rutas apuntan ahí.
+
+## Multiplataforma
+
+Reglas que sigue el código, para que funcione igual en Linux, Windows y macOS:
+
+- `pathlib.Path` siempre, nunca rutas montadas a mano con `/` o `\`.
+- `expanduser()` para las rutas con `~`.
+- `encoding="utf-8-sig"` al leer `acciones.json`: acepta los ficheros con BOM
+  que guarda el Bloc de notas de Windows.
+- `shutil.move` y `shutil.copy2`, nada de `os.system`, `subprocess` ni `shell=True`.
+- Colores con Rich, no con códigos ANSI a mano.
+- Los nombres que genera `renombrar` se validan contra las reglas de Windows
+  (que son las más estrictas): sin `\/:*?"<>|` y sin nombres reservados como
+  `CON` o `NUL`.
+
