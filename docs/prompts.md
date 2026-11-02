@@ -451,5 +451,52 @@ Cinco de los que el nombre no explicaba, el contenido sí. Así que `analizar`
 - Las comparaciones de nombres tienen que normalizarse. Es el primer bug que
   aparece en macOS y en cualquier fichero que venga de un navegador.
 
+---
+
+## 2026-11-02 · `resumir` y `evaluar` no funcionan correctamente
+
+**Prompt (agente plan):**
+
+> Lee @src/tareas/resumen.py y @src/tareas/evaluacion.py. Estas dos órdenes
+> crean el fichero con el formato correcto, pero el contenido que ponen no
+> sirve. Dime exactamente qué falla en cada una y por qué.
+
+**Lo que encontré al probarlas con los PDF de verdad:**
+
+**`resumir` no resume.** Escribe las primeras 25 líneas de cada apartado. Una
+extracción, no un resumen: no condensa, no elige lo importante y no redacta.
+En un documento de 30 páginas, el «resumen» es la primera página.
+
+**`evaluar` genera preguntas que no preguntan nada.** El detector de
+definiciones busca marcas como «es» o «son», que en castellano aparecen en
+casi todas las frases. El resultado son preguntas del tipo:
+
+> 2. Tot aquell exercici que estiga copiat es puntuarà amb 0 punts...
+>    a) ......  b) ......  c) ......  d) ......
+
+Y las cuatro opciones son líneas de puntos: no hay ninguna alternativa real.
+La sección de «Cálculo y problemas» además queda vacía, porque depende de que
+aparezcan fórmulas con el formato `X = ...`, que no es lo habitual.
+
+**La causa de fondo es la misma en las dos:** un resumen de todo el contenido
+y unos ejercicios con sentido **necesitan entender el documento**, y eso lo
+hace un modelo de lenguaje, no unas expresiones regulares. Lo que hay ahora
+es un andamiaje correcto: sabe encontrar el documento, sabe escribir el
+`.odt`/`.docx` con el formato que pide el enunciado y sabe colocar el texto.
+Lo que no sabe es **qué texto poner**.
+
+**Qué he hecho:** documentarlo en el README («Limitaciones conocidas») y en
+el changelog, en vez de disimularlo. Un revisor que lee el código y ve que
+`resumir` recorta las primeras 25 líneas se da cuenta enseguida; y si lo
+tengo escrito yo, con el diagnóstico y la causa, la conversación con el
+profesor va a ser sobre la solución y no sobre el desconocimiento.
+
+**Lo que falta (semana 3):** la capa de IA. El mismo modelo del centro que
+usa OpenCode, llamado desde Python con la clave en un `.env` que nunca se
+sube al repo, y un modo sin red que avise de que estas dos órdenes no pueden
+completarse sin conexión. Se enchufará en el mismo sitio: la función que
+decide el contenido a partir del texto de la ficha.
+
+
 
 
