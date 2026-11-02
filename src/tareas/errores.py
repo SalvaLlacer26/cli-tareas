@@ -5,6 +5,8 @@ Toda la jerarquía hereda de TareasError, así que la CLI puede capturar un
 previsible llega al usuario como una traza de Python.
 """
 
+from __future__ import annotations
+
 
 class TareasError(Exception):
     """Base de todos los errores previsibles de la herramienta."""
@@ -13,9 +15,22 @@ class TareasError(Exception):
 
 
 class ConfigError(TareasError):
-    """acciones.json no existe, no es JSON o no cumple el esquema."""
+    """El fichero de configuración no existe, no es JSON o no cumple el esquema."""
 
     codigo_salida = 3
+
+
+class CarpetaNoValida(ConfigError):
+    """La sección «carpetas» del fichero de configuración está mal.
+
+    Es un error de configuración, así que sale con código 3, como los demás.
+    """
+
+    def __init__(self, carpeta: str, campo: str, motivo: str) -> None:
+        super().__init__(f"Carpeta «{carpeta}», campo «{campo}»: {motivo}")
+        self.carpeta = carpeta
+        self.campo = campo
+        self.motivo = motivo
 
 
 class AccionNoValida(ConfigError):
@@ -28,14 +43,13 @@ class AccionNoValida(ConfigError):
         self.motivo = motivo
 
 
-class CarpetaNoValida(ConfigError):
-    """La sección «carpetas» del fichero de acciones está mal.
+class FormatoNoAnalizable(TareasError):
+    """El formato del fichero no se puede analizar: no hay forma de leerlo."""
 
-    Es un error de configuración, así que sale con código 3, como los demás.
-    """
+    codigo_salida = 1
 
-    def __init__(self, carpeta: str, campo: str, motivo: str) -> None:
-        super().__init__(f"Carpeta «{carpeta}», campo «{campo}»: {motivo}")
-        self.carpeta = carpeta
-        self.campo = campo
-        self.motivo = motivo
+
+class DocumentoNoEncontrado(TareasError):
+    """No se ha encontrado el fichero o la ficha que el comando necesita."""
+
+    codigo_salida = 1
