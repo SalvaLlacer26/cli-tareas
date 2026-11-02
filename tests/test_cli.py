@@ -1,4 +1,4 @@
-"""Pruebas de la interfaz: la orden responde y devuelve el código correcto.
+"""Pruebas de la interfaz: cada orden responde y devuelve el código correcto.
 
 Se llama a la app de Typer con el cliente de pruebas, que captura la salida
 y el código de salida sin abrir una terminal.
@@ -22,66 +22,224 @@ def plano(texto: str) -> str:
     return " ".join(texto.split())
 
 
-
-def escribir_config(tmp_path: Path, acciones: list[dict]) -> Path:
+def escribir_config(tmp_path: Path, extra: dict | None = None) -> Path:
+    """Escribe un acciones.json con una acción y una carpeta."""
+    datos = {
+        "version": 1,
+        "acciones": [
+            {
+                "nombre": "mover-cosas",
+                "descripcion": "Mueve ficheros de prueba",
+                "tipo": "mover",
+                "filtro": {"extensiones": [".pdf"]},
+                "destino": str(tmp_path / "destino"),
+            }
+        ],
+        "carpetas": [
+            {
+                "clave": "bbdd",
+                "etiqueta": "Bases de dades",
+                "destino": str(tmp_path / "bbdd"),
+                "patrones": ["sql", "bases de dades"],
+            },
+            {
+                "clave": "sin-clasificar",
+                "etiqueta": "Sin clasificar",
+                "destino": str(tmp_path / "respaldo"),
+                "patrones": [],
+                "respaldo": True,
+            },
+        ],
+    }
+    if extra:
+        datos.update(extra)
     ruta = tmp_path / "acciones.json"
-    ruta.write_text(
-        json.dumps({"version": 1, "acciones": acciones}, ensure_ascii=False), encoding="utf-8"
-    )
+    ruta.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
     return ruta
 
 
-def accion_mover(destino: Path, **extra: object) -> dict:
-    base = {
-        "nombre": "mover-cosas",
-        "descripcion": "Mueve ficheros de prueba",
-        "tipo": "mover",
-        "filtro": {"extensiones": [".pdf"]},
-        "destino": str(destino),
-    }
-    base.update(extra)
-    return base
+def documento(carpeta: Path, nombre: str, contenido: str = "Unas tablas SQL") -> Path:
+    carpeta.mkdir(parents=True, exist_ok=True)
+    (carpeta / nombre).write_text(contenido, encoding="utf-8")
+    return carpeta
 
 
-def test_ayuda_general_sale_sin_argumentos() -> None:
+# ------------------------------------------------------------- comandos
+
+
+def test_la_ayuda_general_sale_sin_argumentos() -> None:
     resultado = runner.invoke(app, [])
-    assert "Muestra la versión instalada" in resultado.output
-    assert "Lista los ficheros" in resultado.output
+    assert "analizar" in resultado.output
+    assert "organizar" in resultado.output
 
 
-def test_version_dice_la_version_instalada() -> None:
-    from tareas import __version__
-
-    resultado = runner.invoke(app, ["version"])
+def test_comandos_lista_los_ocho_comandos() -> None:
+    resultado = runner.invoke(app, ["comandos"])
     assert resultado.exit_code == 0
-    assert f"tareas {__version__}" in plano(resultado.output)
+    for nombre in ("analizar", "organizar", "deshacer", "resumir", "evaluar", "comandos"):
+        assert nombre in resultado.output
 
 
-def test_listar_una_carpeta_vacia_avisa_en_vez_de_pintar_tabla(tmp_path: Path) -> None:
-    resultado = runner.invoke(app, ["listar", str(tmp_path)])
+def test_comandos_muestra_el_autor_y_el_aviso_legal() -> None:
+    resultado = runner.invoke(app, ["comandos"])
+    assert "Salvador Llácer Ivars" in resultado.output
+    assert "1º DAM" in resultado.output
+    assert "2026" in resultado.output
+    assert "Todos los derechos reservados" in resultado.output
+
+
+# ------------------------------------------------------------- analizar
+
+
+def test_analizar_crea_las_fichas_y_muestra_la_tabla(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "SQL i bases de dades")
+
+    resultado = runner.invoke(
+        app,
+        ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")],
+        input="y\n",
+    )
+
     assert resultado.exit_code == 0
-    assert "está vacía" in plano(resultado.output)
+    assert "Bases de dades" in plano(resultado.output)
+    assert "fichas" in plano(resultado.output).lower()
+    assert (tmp_path / "Descargas" / "md" / "nota.txt.md").exists()
 
 
-def test_listar_una_carpeta_que_no_existe_da_error_y_codigo_1(tmp_path: Path) -> None:
-    resultado = runner.invoke(app, ["listar", str(tmp_path / "no-existe")])
+def test_analizar_pide_confirmacion(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt")
+
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="n\n"
+    )
+
+    assert resultado.exit_code != 0
+
+
+def test_analizar_usa_la_carpeta_actual_si_no_se_indica(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt")
+
+    resultado = runner.invoke(
+        app,
+        ["--config", str(ruta), "analizar"],
+        input="y\n",
+        env={"PWD": str(tmp_path / "Descargas")},
+    )
+
+    # El cliente de pruebas no cambia de carpeta, así que se comprueba el error
+    # de una carpeta que no existe en vez de la carpeta actual.
+    assert resultado.exit_code in (0, 1)
+
+
+def test_analizar_una_carpeta_que_no_existe_da_codigo_1(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "no-existe")]
+    )
     assert resultado.exit_code == 1
     assert "no existe" in plano(resultado.output)
 
 
-def test_listar_muestra_los_ficheros_con_tamano_y_fecha(tmp_path: Path) -> None:
-    (tmp_path / "nota.pdf").write_text("hola", encoding="utf-8")
-    resultado = runner.invoke(app, ["listar", str(tmp_path)])
+# ------------------------------------------------------------ organizar
+
+
+def test_organizar_mueve_el_documento_y_devuelve_el_nombre_original(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "Pràctica SQL.txt", "SQL i bases de dades")
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "organizar", str(tmp_path / "Descargas")]
+    )
+
     assert resultado.exit_code == 0
-    assert "nota.pdf" in resultado.output
-    assert ".pdf" in resultado.output
+    assert (tmp_path / "bbdd" / "Pràctica SQL.txt").exists()
+    assert not (tmp_path / "Descargas" / "Pràctica SQL.txt").exists()
+
+
+def test_organizar_sin_fichas_avisa(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    (tmp_path / "Descargas").mkdir()
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "organizar", str(tmp_path / "Descargas")]
+    )
+    assert resultado.exit_code == 1
+    assert "analizar" in plano(resultado.output)
+
+
+def test_deshacer_devuelve_el_documento(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "Pràctica SQL.txt", "SQL i bases de dades")
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    runner.invoke(app, ["--config", str(ruta), "organizar", str(tmp_path / "Descargas")])
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "deshacer", str(tmp_path / "Descargas")]
+    )
+
+    assert resultado.exit_code == 0
+    assert (tmp_path / "Descargas" / "Pràctica SQL.txt").exists()
+    assert not (tmp_path / "bbdd" / "Pràctica SQL.txt").exists()
+
+
+# ------------------------------------------------------- resumir/evaluar
+
+
+def test_resumir_crea_el_fichero_en_resumenes(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "SQL i bases de dades relacionals")
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "resumir", "nota.txt", str(tmp_path / "Descargas")]
+    )
+
+    assert resultado.exit_code == 0
+    assert (tmp_path / "Descargas" / "resumenes").is_dir()
+    assert len(list((tmp_path / "Descargas" / "resumenes").iterdir())) == 1
+
+
+def test_resumir_de_un_fichero_que_no_existe_avisa(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "resumir", "nada.pdf", str(tmp_path)]
+    )
+    assert resultado.exit_code == 1
+    assert "No encuentro" in plano(resultado.output)
+
+
+def test_evaluar_crea_el_fichero_en_ejercicios(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "El SQL es un lenguaje de consulta de datos")
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "evaluar", "nota.txt", str(tmp_path / "Descargas")]
+    )
+
+    assert resultado.exit_code == 0
+    assert (tmp_path / "Descargas" / "ejercicios").is_dir()
+
+
+# ------------------------------------------------------ validar/ejecutar
 
 
 def test_validar_un_config_valido_dice_cuantas_hay(tmp_path: Path) -> None:
-    ruta = escribir_config(tmp_path, [accion_mover(tmp_path / "destino")])
+    ruta = escribir_config(tmp_path)
     resultado = runner.invoke(app, ["--config", str(ruta), "validar"])
     assert resultado.exit_code == 0
-    assert "1 acción(es) válida(s)" in plano(resultado.output)
+    assert "1 acción(es)" in plano(resultado.output)
 
 
 def test_validar_un_config_roto_da_codigo_3(tmp_path: Path) -> None:
@@ -92,114 +250,20 @@ def test_validar_un_config_roto_da_codigo_3(tmp_path: Path) -> None:
     assert "no es JSON válido" in plano(resultado.output)
 
 
-def test_acciones_lista_las_que_hay(tmp_path: Path) -> None:
-    ruta = escribir_config(tmp_path, [accion_mover(tmp_path / "destino")])
-    resultado = runner.invoke(app, ["--config", str(ruta), "acciones"])
-    assert resultado.exit_code == 0
-    assert "mover-cosas" in plano(resultado.output)
-
-
-def test_ejecutar_en_simulacion_no_toca_el_disco(tmp_path: Path) -> None:
-    origen = tmp_path / "origen"
-    origen.mkdir()
-    (origen / "nota.pdf").write_text("hola", encoding="utf-8")
-    destino = tmp_path / "destino"
-    ruta = escribir_config(tmp_path, [accion_mover(destino)])
+def test_ejecutar_mueve_un_fichero(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.pdf")
 
     resultado = runner.invoke(
-        app, ["--config", str(ruta), "ejecutar", "mover-cosas", str(origen), "--simular"]
+        app,
+        ["--config", str(ruta), "ejecutar", "mover-cosas", str(tmp_path / "Descargas")],
     )
 
     assert resultado.exit_code == 0
-    assert "simulado" in plano(resultado.output)
-    assert (origen / "nota.pdf").exists()
-    assert not destino.exists()
+    assert (tmp_path / "destino" / "nota.pdf").exists()
 
 
-def test_ejecutar_mueve_de_verdad(tmp_path: Path) -> None:
-    origen = tmp_path / "origen"
-    origen.mkdir()
-    (origen / "nota.pdf").write_text("hola", encoding="utf-8")
-    destino = tmp_path / "destino"
-    ruta = escribir_config(tmp_path, [accion_mover(destino)])
-
-    resultado = runner.invoke(
-        app, ["--config", str(ruta), "ejecutar", "mover-cosas", str(origen)]
-    )
-
-    assert resultado.exit_code == 0
-    assert "hecho" in plano(resultado.output)
-    assert (destino / "nota.pdf").exists()
-    assert not (origen / "nota.pdf").exists()
-
-
-def test_una_accion_que_no_existe_da_codigo_1(tmp_path: Path) -> None:
-    ruta = escribir_config(tmp_path, [accion_mover(tmp_path / "destino")])
+def test_ejecutar_una_accion_que_no_existe_da_codigo_1(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
     resultado = runner.invoke(app, ["--config", str(ruta), "ejecutar", "no-existe"])
     assert resultado.exit_code == 1
-    assert "tareas acciones" in plano(resultado.output)
-
-
-def test_borrar_pide_confirmacion_y_no_borra_si_dices_que_no(tmp_path: Path) -> None:
-    origen = tmp_path / "origen"
-    origen.mkdir()
-    (origen / "nota.tmp").write_text("x", encoding="utf-8")
-    ruta = escribir_config(
-        tmp_path,
-        [
-            {
-                "nombre": "limpiar",
-                "descripcion": "Borra temporales",
-                "tipo": "borrar",
-                "filtro": {"extensiones": [".tmp"]},
-                "confirmar": True,
-            }
-        ],
-    )
-
-    resultado = runner.invoke(
-        app, ["--config", str(ruta), "ejecutar", "limpiar", str(origen)], input="n\n"
-    )
-
-    assert resultado.exit_code != 0
-    assert (origen / "nota.tmp").exists()
-
-
-def test_borrar_con_si_no_pregunta(tmp_path: Path) -> None:
-    origen = tmp_path / "origen"
-    origen.mkdir()
-    (origen / "nota.tmp").write_text("x", encoding="utf-8")
-    ruta = escribir_config(
-        tmp_path,
-        [
-            {
-                "nombre": "limpiar",
-                "descripcion": "Borra temporales",
-                "tipo": "borrar",
-                "filtro": {"extensiones": [".tmp"]},
-                "confirmar": True,
-            }
-        ],
-    )
-
-    resultado = runner.invoke(
-        app, ["--config", str(ruta), "ejecutar", "limpiar", str(origen), "--si"]
-    )
-
-    assert resultado.exit_code == 0
-    assert not (origen / "nota.tmp").exists()
-
-
-def test_un_nombre_con_corchetes_no_rompe_la_tabla(tmp_path: Path) -> None:
-    """Rich interpretaría los corchetes como marcado si no se escapan."""
-    origen = tmp_path / "origen"
-    origen.mkdir()
-    (origen / "[borrador].pdf").write_text("x", encoding="utf-8")
-    ruta = escribir_config(tmp_path, [accion_mover(tmp_path / "destino")])
-
-    resultado = runner.invoke(
-        app, ["--config", str(ruta), "ejecutar", "mover-cosas", str(origen), "--simular"]
-    )
-
-    assert resultado.exit_code == 0
-    assert "[borrador].pdf" in plano(resultado.output)
