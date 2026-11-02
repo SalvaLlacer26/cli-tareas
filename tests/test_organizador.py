@@ -90,6 +90,22 @@ def test_normalizar_es_idempotente() -> None:
     assert una == dos
 
 
+def test_normalizar_keeps_las_extensiones_compuestas() -> None:
+    """«.tar.xz» no puede convertirse en «-tar.xz»: la extensión se pierde."""
+    from tareas.nombres import normalizar
+
+    assert normalizar("FileZilla_linux-gnu.tar.xz", "sin-clasificar") == (
+        "sin-clasificar_filezilla-linux-gnu.tar.xz"
+    )
+
+
+def test_normalizar_no_confunde_los_puntos_del_nombre() -> None:
+    """«P1.2. Activitats.pdf» tiene dos puntos, pero solo una extensión."""
+    from tareas.nombres import normalizar
+
+    assert normalizar("P1.2. Activitats.pdf", "bbdd") == "bbdd_p1-2-activitats.pdf"
+
+
 # ------------------------------------------------------------ clasificación
 
 
@@ -201,6 +217,45 @@ def test_organizar_en_simulacion_no_toca_el_disco(base: Path) -> None:
     assert resultados[0].estado == "simulado"
     assert (descargas / "nota.pdf").exists()
     assert not (base / "bbdd").exists()
+
+
+def test_un_instalador_no_va_a_ninguna_asignatura(base: Path) -> None:
+    """Un .tar.gz con «linux» en el nombre no son apuntes de Sistemas."""
+    descargas = base / "Descargas"
+    descargas.mkdir(parents=True)
+    (descargas / "FileZilla_linux-gnu.tar.xz").write_text("x", encoding="utf-8")
+
+    carpetas = montar_carpetas(base)
+    organizador = Organizador(carpetas, manifiesto_de_prueba(base), documentos=[".pdf"])
+    organizador.organizar(descargas, simular=False)
+
+    assert (base / "sin-clasificar" / "sin-clasificar_filezilla-linux-gnu.tar.xz").exists()
+
+
+def test_una_imagen_no_va_a_ninguna_asignatura(base: Path) -> None:
+    """Una foto de una biblioteca no es material de estudio de Bases de Datos."""
+    descargas = base / "Descargas"
+    descargas.mkdir(parents=True)
+    (descargas / "plano de biblioteca.png").write_text("x", encoding="utf-8")
+
+    carpetas = montar_carpetas(base)
+    organizador = Organizador(carpetas, manifiesto_de_prueba(base), documentos=[".pdf"])
+    organizador.organizar(descargas, simular=False)
+
+    assert (base / "sin-clasificar" / "sin-clasificar_plano-de-biblioteca.png").exists()
+    assert not (base / "bbdd").exists()
+
+
+def test_sin_lista_de_documentos_se_clasifica_todo(base: Path) -> None:
+    """Si no se dice qué es un documento, se clasifica todo por su nombre."""
+    descargas = base / "Descargas"
+    descargas.mkdir(parents=True)
+    (descargas / "nota sql.pdf").write_text("x", encoding="utf-8")
+
+    carpetas = montar_carpetas(base)
+    Organizador(carpetas, manifiesto_de_prueba(base)).organizar(descargas, simular=False)
+
+    assert (base / "bbdd" / "bbdd_nota-sql.pdf").exists()
 
 
 # ------------------------------------------------------------ desorganizar
