@@ -119,7 +119,11 @@ volver a organizar sin analizar otra vez.
 ### 4 · `resumir` y `evaluar`
 
 Trabajan sobre lo que ya hay en la ficha, así que no vuelven a abrir el
-documento. El formato del fichero que se crea depende del sistema operativo:
+documento. **El resumen y los ejercicios los escribe un modelo de IA**: el
+texto del documento se le envía al modelo del centro y vuelve ya resumido, con
+apartados, negritas y tablas.
+
+El formato del fichero que se crea depende del sistema operativo:
 
 | Sistema | Formato | Programa |
 |---|---|---|
@@ -130,6 +134,54 @@ documento. El formato del fichero que se crea depende del sistema operativo:
 
 Los `.odt` y los `.docx` se generan con la biblioteca estándar (son ficheros
 ZIP con el XML dentro), así que no hace falta instalar nada para escribirlos.
+
+#### Configurar el modelo
+
+La clave **nunca** va en el repo. Se copia el fichero de ejemplo y se rellena:
+
+```bash
+cp .env.example .env
+```
+
+```bash
+TAREAS_IA_URL=https://ia.simarro/llmapi/v1
+TAREAS_IA_KEY=la-clave-del-profesor
+TAREAS_MODELO=Qwen38-DualSpark-low
+TAREAS_IA_CA=~/.config/opencode/ca-simarro.crt
+```
+
+| Variable | Para qué |
+|---|---|
+| `TAREAS_IA_URL` | Dirección del servidor. Debe acabar en `/v1`. |
+| `TAREAS_IA_KEY` | La clave del modelo. |
+| `TAREAS_MODELO` | Qué modelo usar. Si se deja vacío, el de por defecto. |
+| `TAREAS_IA_CA` | Certificado propio del servidor, si lo tiene (en el centro, hace falta). |
+| `TAREAS_IA_TIMEOUT` | Segundos de espera. Por defecto 600, porque los modelos del centro tardan. |
+
+El fichero `.env` se busca en la carpeta desde la que se lanza la orden y en
+`~/.config/tareas/.env`. Las variables de entorno del sistema tienen prioridad.
+
+#### Sin red o sin clave
+
+Si no hay modelo (no hay clave, no hay red, el servidor falla), la CLI **no
+se rompe**: lo explica en una línea y genera la versión extractiva, que corta
+las primeras 25 líneas de cada apartado. El documento lleva una nota dizendo
+que se ha hecho sin IA, para que nadie se tome por bueno un resumen que no lo
+es.
+
+#### Privacidad
+
+Al resumir o evaluar, **el texto del documento sale del equipo** y va al
+servidor que tengas configurado. Con la configuración por defecto va a
+`ia.simarro`, que es un servidor de tu instituto. Si prefieres que no salga
+nada, usa un Ollama en local:
+
+```bash
+TAREAS_IA_URL=http://localhost:11434/v1
+TAREAS_IA_KEY=ollama
+TAREAS_MODELO=llama3.2
+```
+
 
 ## Esquema de acciones.json
 
@@ -167,54 +219,42 @@ ZIP con el XML dentro), así que no hace falta instalar nada para escribirlos.
 
 ## Limitaciones conocidas
 
-Las seis órdenes están implementadas y funcionan, pero dos de ellas **no dan
-el resultado que prometen**. Lo dejo escrito aquí y en el historial de git
-para que no se me olvide ni se le olvide a nadie.
+Las ocho órdenes están implementadas y funcionan. Queda una cosa que conviene
+saber:
 
-### `tareas resumir` no resume: recorta
+### Los resúmenes y los ejercicios tardan
 
-Lo que hace es escribir **las primeras 25 líneas de cada apartado** del
-documento, con un aviso al final saying que se ha recortado. Es una
-**extracción**, no un resumen: no condensa, no elige lo importante y no
-redacta. En un documento de 30 páginas, el «resumen» es la primera página.
+Con los modelos del centro, resumir un documento de unas 30 páginas tarda
+**entre 1 y 4 minutos**. No es un fallo: el modelo del centro es lento con
+documentos largos y la red del instituto tampoco ayuda. Para archivos sueltos
+va bien.
 
-### `tareas evaluar` no genera preguntas útiles
+Si quieres que vaya más rápido, usa un modelo más ligero
+(`Qwen38-DualSpark-low`) o recorta el documento antes de resumirlo.
 
-Tres cosas van mal:
+### `tareas resumir` y `tareas evaluar` necesitan un modelo
 
-1. **Las opciones del tipo test están vacías.** Se escriben cuatro líneas de
-   puntos (`a) .....`) sin ninguna alternativa real.
-2. **Las preguntas no preguntan nada.** Para detectar definiciones se buscan
-   marcas como «es» o «son», que aparecen en casi todas las frases en
-   castellano: el resultado son preguntas como «Tot aquell exercici que
-   estiga copiat...» con cuatro huecos.
-3. **La sección de cálculo suele quedar vacía**, porque depende de que
-   aparezcan fórmulas con el formato `X = ...`, que no es lo habitual en los
-   apuntes.
+Sin `TAREAS_IA_KEY` (o sin red) estas dos órdenes **no pueden hacer su
+trabajo**: avisan y generan una versión extractiva, que corta el principio de
+cada apartado. El documento lleva una nota que lo dice. Es el modo sin red:
+las otras seis órdenes siguen funcionando igual.
 
-La causa de fondo es la misma en los dos casos: **un resumen de todo el
-contenido y unos ejercicios con sentido necesitan entender el documento**, y
-eso lo hace un modelo de lenguaje, no unas expresiones regulares. Lo que hay
-ahora es un andamiaje: sabe escribir el fichero con el formato correcto, sabe
-encontrar el documento y sabe colocar el texto, pero **no sabe qué texto
-poner**.
+### El resumen extractivo es una extracción, no un resumen
 
-### Cómo se arregla
-
-Con la **capa de IA** (semana 3): el mismo modelo del centro que usa
-OpenCode, llamado desde Python, con la clave en un `.env` que nunca se sube
-al repo. Se enchufará en el mismo sitio —la función que decide el contenido a
-partir del texto de la ficha— y las dos órdenes dejarán de depender de
-expresiones regulares. Mientras tanto, el modo sin red tiene que avisar de
-que estas dos órdenes no pueden completarse sin conexión.
+Cuando el resumen lo hace la IA, es un resumen de verdad. Cuando cae al
+respaldo extractivo, lo que sale son las primeras 25 líneas de cada apartado:
+es una extracción, y el documento lo indica. Lo que **no** hace ninguna de las
+dos versiones es inventar contenido que no esté en el documento.
 
 ## Estructura
+
 
 ```
 cli-tareas/
 ├── pyproject.toml          # [project.scripts] tareas = "tareas.cli:app"
 ├── README.md
 ├── .gitignore              # .venv/, __pycache__/, .env
+├── .env.example            # cómo configurar el modelo de IA (sin claves)
 ├── .gitattributes          # * text=auto
 ├── acciones.json           # la configuración: asignaturas y acciones
 ├── docs/
@@ -239,6 +279,8 @@ cli-tareas/
 │   ├── nombres.py          # qué nombres son compatibles y cómo se limpian
 │   ├── organizador.py      # organizar y deshacer
 │   ├── documentos.py       # escribir .odt, .docx, .rtf y .txt
+│   ├── ia.py               # la capa de IA: cliente del servidor de modelos
+│   ├── markdown.py         # de la respuesta en Markdown a las secciones
 │   ├── resumen.py          # el resumen
 │   ├── evaluacion.py       # los ejercicios
 │   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)
