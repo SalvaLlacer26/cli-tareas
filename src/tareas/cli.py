@@ -11,6 +11,7 @@ Si no se pone, se trabaja sobre la carpeta en la que está la terminal.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -53,6 +54,22 @@ def carpeta_de_trabajo(carpeta: Path | None) -> Path:
 def error_legible(exc: Exception) -> str:
     """Prepara un mensaje de error para Rich, escapando el marcado."""
     return escape(str(exc))
+
+
+def simbolo(bonito: str, alternativa: str) -> str:
+    """Un símbolo que la consola de este equipo pueda escribir.
+
+    En Windows la consola usa cp1252 por defecto, y ahí no caben algunos
+    símbolos como «✔» (U+2714): al imprimirlos, Python revienta con un
+    UnicodeEncodeError. Aquí se prueba el símbolo y, si no cabe, se usa el
+    texto de siempre. Lo descubrió la CI al fallar en Windows.
+    """
+    codificacion = getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        bonito.encode(codificacion)
+    except (UnicodeEncodeError, LookupError):
+        return alternativa
+    return bonito
 
 
 @app.callback()
@@ -265,7 +282,7 @@ def validar_cmd(ctx: typer.Context) -> None:
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     consola.print(
-        f"[green]✔ {len(configuracion.acciones)} acción(es) y "
+        f"[green]{simbolo('✔', 'OK')} {len(configuracion.acciones)} acción(es) y "
         f"{len(configuracion.carpetas)} carpeta(s) válidas.[/green]"
     )
 
