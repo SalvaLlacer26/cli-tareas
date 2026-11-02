@@ -1,0 +1,42 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pruebas:
+    name: ${{ matrix.os }} · Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Preparar Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Instalar el proyecto
+        run: uv sync --all-extras
+
+      - name: Comprobar que la CLI se instala y responde
+        run: |
+          uv tool install --editable .
+          tareas --help
+          tareas version
+
+      - name: Validar el fichero de acciones del repo
+        run: uv run tareas validar
+
+      - name: Lanzar las pruebas
+        run: uv run pytest -v
