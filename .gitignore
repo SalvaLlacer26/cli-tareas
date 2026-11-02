@@ -8,3 +8,8 @@ dist/
 
 # Secretos: claves de API y configuración privada. NUNCA al repo.
 .env
+
+# Carpetas que crea la propia herramienta si se ejecuta dentro del repo.
+/md/
+/resumenes/
+/ejercicios/

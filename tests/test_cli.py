@@ -118,20 +118,18 @@ def test_analizar_pide_confirmacion(tmp_path: Path) -> None:
     assert resultado.exit_code != 0
 
 
-def test_analizar_usa_la_carpeta_actual_si_no_se_indica(tmp_path: Path) -> None:
+def test_analizar_usa_la_carpeta_actual_si_no_se_indica(tmp_path: Path, monkeypatch) -> None:
+    """Sin argumento, trabaja sobre la carpeta en la que está la terminal."""
     ruta = escribir_config(tmp_path)
     documento(tmp_path / "Descargas", "nota.txt")
+    monkeypatch.chdir(tmp_path / "Descargas")
 
     resultado = runner.invoke(
-        app,
-        ["--config", str(ruta), "analizar"],
-        input="y\n",
-        env={"PWD": str(tmp_path / "Descargas")},
+        app, ["--config", str(ruta), "analizar"], input="y\n"
     )
 
-    # El cliente de pruebas no cambia de carpeta, así que se comprueba el error
-    # de una carpeta que no existe en vez de la carpeta actual.
-    assert resultado.exit_code in (0, 1)
+    assert resultado.exit_code == 0
+    assert (tmp_path / "Descargas" / "md" / "nota.txt.md").exists()
 
 
 def test_analizar_una_carpeta_que_no_existe_da_codigo_1(tmp_path: Path) -> None:
