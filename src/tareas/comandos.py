@@ -71,8 +71,10 @@ COMANDOS: list[FichaComando] = [
         para_que=(
             "Crea un documento con un resumen del contenido del archivo indicado, de "
             "como máximo diez páginas, sin imágenes y con el texto organizado en "
-            "apartados y tablas. Se guarda en la carpeta «resumenes» con el nombre del "
-            "archivo seguido de «_resumido»."
+            "apartados y tablas. El resumen lo escribe un modelo de IA (el del "
+            "centro, con la clave en el .env); si no hay modelo o no hay red, avisa y "
+            "hace una versión extractiva. Se guarda en la carpeta «resumenes» con el "
+            "nombre del archivo seguido de «_resumido»."
         ),
         ejemplo="tareas resumir 'A21_IntroduccióGit_GitHub.pdf'",
     ),
@@ -81,9 +83,11 @@ COMANDOS: list[FichaComando] = [
         uso="tareas evaluar 'NOMBRE_DE_ARCHIVO' [CARPETA]",
         para_que=(
             "Crea un documento con ejercicios sobre el archivo indicado: preguntas tipo "
-            "test, preguntas de desarrollo y problemas de cálculo, según lo que se ha "
-            "detectado en su contenido. Se guarda en la carpeta «ejercicios» con el "
-            "nombre del archivo seguido de «_test»."
+            "test con alternativas reales, preguntas de desarrollo y problemas de "
+            "cálculo, con sus soluciones. Los prepara un modelo de IA (el del centro, "
+            "con la clave en el .env); si no hay modelo o no hay red, avisa y hace una "
+            "versión extractiva. Se guarda en la carpeta «ejercicios» con el nombre "
+            "del archivo seguido de «_test»."
         ),
         ejemplo="tareas evaluar 'A21_IntroduccióGit_GitHub.pdf'",
     ),
