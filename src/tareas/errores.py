@@ -53,3 +53,14 @@ class DocumentoNoEncontrado(TareasError):
     """No se ha encontrado el fichero o la ficha que el comando necesita."""
 
     codigo_salida = 1
+
+
+class ErrorIA(TareasError):
+    """No se ha podido usar el modelo de IA.
+
+    El mensaje es de una línea y explica el motivo (falta la clave, no hay
+    red, el servidor ha contestado un error). La CLI lo enseña y sigue
+    funcionando con lo que no necesita IA.
+    """
+
+    codigo_salida = 1

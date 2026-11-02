@@ -1,6 +1,6 @@
 [project]
 name = "tareas"
-version = "2.0.1"
+version = "2.1.0"
 description = "Automatiza tareas repetitivas con ficheros desde la terminal"
 readme = "README.md"
 authors = [
@@ -22,4 +22,10 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "ia: pruebas que necesitan el servidor de modelos de verdad (se piden con -m ia)",
 ]
