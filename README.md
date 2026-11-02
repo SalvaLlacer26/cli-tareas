@@ -165,6 +165,49 @@ ZIP con el XML dentro), así que no hace falta instalar nada para escribirlos.
 | `plantilla` | `renombrar` | texto | El nombre nuevo: `{fecha:%Y-%m-%d}`, `{n:03}`, `{ext}`, `{nombre}`. |
 | `confirmar` | `borrar` | booleano | Las acciones que borran siempre preguntan. |
 
+## Limitaciones conocidas
+
+Las seis órdenes están implementadas y funcionan, pero dos de ellas **no dan
+el resultado que prometen**. Lo dejo escrito aquí y en el historial de git
+para que no se me olvide ni se le olvide a nadie.
+
+### `tareas resumir` no resume: recorta
+
+Lo que hace es escribir **las primeras 25 líneas de cada apartado** del
+documento, con un aviso al final saying que se ha recortado. Es una
+**extracción**, no un resumen: no condensa, no elige lo importante y no
+redacta. En un documento de 30 páginas, el «resumen» es la primera página.
+
+### `tareas evaluar` no genera preguntas útiles
+
+Tres cosas van mal:
+
+1. **Las opciones del tipo test están vacías.** Se escriben cuatro líneas de
+   puntos (`a) .....`) sin ninguna alternativa real.
+2. **Las preguntas no preguntan nada.** Para detectar definiciones se buscan
+   marcas como «es» o «son», que aparecen en casi todas las frases en
+   castellano: el resultado son preguntas como «Tot aquell exercici que
+   estiga copiat...» con cuatro huecos.
+3. **La sección de cálculo suele quedar vacía**, porque depende de que
+   aparezcan fórmulas con el formato `X = ...`, que no es lo habitual en los
+   apuntes.
+
+La causa de fondo es la misma en los dos casos: **un resumen de todo el
+contenido y unos ejercicios con sentido necesitan entender el documento**, y
+eso lo hace un modelo de lenguaje, no unas expresiones regulares. Lo que hay
+ahora es un andamiaje: sabe escribir el fichero con el formato correcto, sabe
+encontrar el documento y sabe colocar el texto, pero **no sabe qué texto
+poner**.
+
+### Cómo se arregla
+
+Con la **capa de IA** (semana 3): el mismo modelo del centro que usa
+OpenCode, llamado desde Python, con la clave en un `.env` que nunca se sube
+al repo. Se enchufará en el mismo sitio —la función que decide el contenido a
+partir del texto de la ficha— y las dos órdenes dejarán de depender de
+expresiones regulares. Mientras tanto, el modo sin red tiene que avisar de
+que estas dos órdenes no pueden completarse sin conexión.
+
 ## Estructura
 
 ```

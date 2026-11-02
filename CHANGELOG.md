@@ -6,6 +6,32 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.0.1] — 2026-11-02
+
+### Documentado
+
+- **Las órdenes `resumir` y `evaluar` no funcionan correctamente.** Las dos
+  crean el fichero con el formato correcto y lo abren bien, pero el contenido
+  que ponen no es el que promete el enunciado:
+  - `resumir` **recorta** las primeras 25 líneas de cada apartado. Es una
+    extracción, no un resumen: no condensa ni elige lo importante.
+  - `evaluar` busca definiciones con marcas como «es» o «son», que aparecen
+    en casi todas las frases en castellano, así que las preguntas no preguntan
+    nada; las cuatro opciones del tipo test están vacías, y la sección de
+    cálculo suele quedar vacía porque depende de que aparezcan fórmulas con
+    el formato `X = ...`.
+
+  La causa de fondo es la misma: un resumen de todo el contenido y unos
+  ejercicios con sentido necesitan **entender** el documento, y eso lo hace un
+  modelo de lenguaje, no unas expresiones regulares. Lo que hay ahora es el
+  andamiaje: sabe encontrar el documento, sabe escribir el `.odt`/`.docx` y
+  sabe colocar el texto, pero no sabe **qué texto poner**.
+
+  Queda escrito en el README («Limitaciones conocidas») en vez de
+  disimularlo. La solución es la capa de IA de la semana 3, que se enchufará
+  en el mismo sitio: la función que decide el contenido a partir del texto de
+  la ficha.
+
 ## [v2.0.0] — 2026-11-02
 
 Reformulación completa de la herramienta. Ahora el trabajo se hace en tres
