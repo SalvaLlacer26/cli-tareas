@@ -193,7 +193,16 @@
         "biblioteca",
         "model e-r",
         "sistemes gestors",
-        "s-g-s"
+        "s-g-s",
+        "model relacional",
+        "bases de datos",
+        "introducción a las bases",
+        "introduccion a las bases",
+        "sistemas gestores",
+        "modelo relacional",
+        "entidades",
+        "atributos",
+        "clave primaria"
       ]
     },
     {
@@ -211,7 +220,12 @@
         "commit",
         "branch",
         "merge",
-        "ide"
+        "ide",
+        "prototipatge",
+        "entornos de desarrollo",
+        "desarrollo",
+        "control de versiones",
+        "entorno de desarrollo"
       ]
     },
     {
@@ -230,7 +244,13 @@
         "disseny",
         "web",
         "etiqueta",
-        "dhtml"
+        "dhtml",
+        "prototipatge",
+        "lenguaje de marcas",
+        "marcas",
+        "etiquetas",
+        "páginas web",
+        "hipertext"
       ]
     },
     {
@@ -249,7 +269,12 @@
         "llistes",
         "variables",
         "eclipse",
-        "netbeans"
+        "netbeans",
+        "programación",
+        "algoritmo",
+        "pseudocódigo",
+        "funciones",
+        "listas"
       ]
     },
     {
@@ -263,7 +288,9 @@
         "fork",
         "rúbrica",
         "rubrica",
-        "treball en equip"
+        "treball en equip",
+        "proyecto intermodular",
+        "trabajo en equipo"
       ]
     },
     {
@@ -284,7 +311,11 @@
         "servidors",
         "hardware",
         "numeració",
-        "sistemes de numeració"
+        "sistemes de numeració",
+        "sistemas informáticos",
+        "sistemas",
+        "informáticos",
+        "numeración"
       ]
     },
     {
@@ -294,30 +325,5 @@
       "patrones": [],
       "respaldo": true
     }
-  ],
-  "organizador": {
-    "descargas": "/home/salllaiva/pruebas-tareas/Descargas",
-    "documentos": [
-      ".pdf",
-      ".docx",
-      ".doc",
-      ".odt",
-      ".odp",
-      ".ods",
-      ".odb",
-      ".pptx",
-      ".ppt",
-      ".txt",
-      ".md",
-      ".rtf",
-      ".epub",
-      ".html",
-      ".htm",
-      ".xml",
-      ".csv",
-      ".fodt",
-      ".fodp",
-      ".sxw"
-    ]
-  }
+  ]
 }

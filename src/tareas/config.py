@@ -1,8 +1,9 @@
-"""Lectura y validación de acciones.json.
+"""Lectura y validación del fichero de configuración.
 
-Este módulo desconfía del JSON: comprueba el fichero entero ANTES de que el
-motor toque un solo fichero. Cuando algo falla, el mensaje dice qué acción y
-qué campo fallan, para que se pueda arreglar en diez segundos.
+El fichero se llama `acciones.json` y vive en la carpeta de la persona (o en
+la del usuario, si lo quiere usar desde cualquier sitio). Este módulo lo
+desconfía: comprueba el fichero entero ANTES de que se toque un solo
+fichero, y cuando algo falla el mensaje dice qué campo está mal.
 """
 
 from __future__ import annotations
@@ -10,12 +11,15 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
-from .carpetas import Carpeta, cargar_carpetas
-from .errores import AccionNoValida, ConfigError
 from platformdirs import user_config_dir
+
+from .clasificador import Carpeta, cargar_carpetas
+from .errores import AccionNoValida, ConfigError
+
+#: Nombre del fichero de configuración.
+ARCHIVO = "acciones.json"
 
 #: Tipos de acción que el motor sabe ejecutar.
 TIPOS = ("mover", "copiar", "renombrar", "borrar")
@@ -32,96 +36,54 @@ DESTRUCTIVAS = ("borrar",)
 #: Claves que se admiten dentro de «filtro».
 CLAVES_FILTRO = ("extensiones", "patron", "mas_antiguo_que_dias", "mayor_que_mb")
 
-#: Campos que se admiten en una acción. Lo que no esté aquí es un error:
-#: escribir «patron» fuera de «filtro» haría que la acción se aplicase a todo.
+#: Campos que se admiten en una acción.
 CLAVES_ACCION = (
-    "nombre", "descripcion", "tipo", "origen", "filtro", "destino",
-    "plantilla", "confirmar", "carpeta",
+    "nombre", "descripcion", "tipo", "carpeta", "origen", "filtro", "destino",
+    "plantilla", "confirmar",
 )
 
 #: Huecos que la plantilla de renombrar puede usar.
 HUECOS_PLANTILLA = ("fecha", "n", "ext", "nombre")
 
-#: Caracteres que Windows no admite en un nombre de fichero.
-CARACTERES_INVALIDOS = '<>:"/\\|?*'
-
-#: Nombres que Windows reserva y no puede usar.
-NOMBRES_RESERVADOS = (
-    "CON", "PRN", "AUX", "NUL",
-    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-)
-
 #: Formato obligatorio del campo «nombre».
 RE_NOMBRE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-
-#: Carpeta de descargas por defecto, si el fichero de acciones no dice otra cosa.
-DESCARGAS_POR_DEFECTO = "~/Downloads"
-
-#: Nombre del fichero de acciones por defecto.
-ARCHIVO_POR_DEFECTO = "acciones.json"
-
-#: Extensiones que se consideran material de estudio. Un instalador o una
-#: foto no son apuntes, aunque su nombre coincida con el de una asignatura.
-DOCUMENTOS_POR_DEFECTO = (
-    ".pdf", ".docx", ".doc", ".odt", ".odp", ".ods", ".pptx", ".ppt",
-    ".txt", ".md", ".rtf", ".epub", ".html", ".htm", ".xml", ".csv",
-    ".odb", ".fodt", ".fodp", ".sxw",
-)
-
-
-def ruta_de_usuario() -> Path:
-    """El fichero de acciones de la configuración del usuario.
-
-    Se busca aquí cuando no hay un «acciones.json» en la carpeta desde la que
-    se lanza la orden, para que la herramienta se pueda usar desde cualquier
-    sitio sin tener que pasar --config cada vez.
-
-    - Linux/macOS: ``~/.config/tareas/acciones.json``
-    - Windows: ``%APPDATA%\\tareas\\acciones.json``
-    """
-    return Path(user_config_dir("tareas")) / ARCHIVO_POR_DEFECTO
-
 
 
 @dataclass
 class Configuracion:
-    """Todo lo que se lee de un fichero de acciones.json."""
+    """Todo lo que se lee del fichero de configuración."""
 
     acciones: list[dict] = field(default_factory=list)
     carpetas: list[Carpeta] = field(default_factory=list)
-    descargas: Path = field(default_factory=lambda: Path(DESCARGAS_POR_DEFECTO).expanduser())
-    documentos: list[str] = field(default_factory=lambda: list(DOCUMENTOS_POR_DEFECTO))
+    ruta: Path | None = None
+
+    def carpeta_por_clave(self, clave: str) -> Carpeta | None:
+        for carpeta in self.carpetas:
+            if carpeta.clave == clave:
+                return carpeta
+        return None
 
 
+def ruta_de_usuario() -> Path:
+    """El fichero de configuración de la persona.
 
-
-def cargar(ruta: Path) -> list[dict]:
-    """Lee y valida un fichero de acciones. Devuelve la lista de acciones.
-
-    Lanza ConfigError (código de salida 3) si el fichero no existe, no es JSON
-    o no cumple el esquema, y AccionNoValida concrete qué acción y campo
-    están mal.
+    - Linux/macOS: ``~/.config/tareas/acciones.json``
+    - Windows: ``%APPDATA%\\tareas\\acciones.json``
     """
-    return cargar_config(ruta).acciones
+    return Path(user_config_dir("tareas")) / ARCHIVO
 
 
-def cargar_config(ruta: Path) -> Configuracion:
-    """Lee el fichero de acciones entero: acciones, carpetas y carpeta de descargas.
-
-    Si la ruta no existe y es la de por defecto, se busca el fichero de
-    acciones de la configuración del usuario. Si tampoco está, se dice dónde
-    se puede poner.
-    """
-    ruta = ruta.expanduser()
+def cargar(ruta: Path) -> Configuracion:
+    """Lee y valida el fichero de configuración."""
+    ruta = Path(ruta).expanduser()
     if not ruta.is_file():
         propia = ruta_de_usuario()
-        if propia.is_file() and ruta.name == ARCHIVO_POR_DEFECTO:
+        if propia.is_file() and ruta.name == ARCHIVO:
             ruta = propia
         else:
             raise ConfigError(
-                f"No encuentro «{ruta}». Crea acciones.json, usa --config RUTA para otro "
-                f"fichero, o pon uno en «{propia}» para usarlo desde cualquier carpeta."
+                f"No encuentro «{ruta}». Crea {ARCHIVO}, usa --config RUTA para otro fichero, "
+                f"o pon uno en «{propia}» para usarlo desde cualquier carpeta."
             )
 
     try:
@@ -158,58 +120,28 @@ def cargar_config(ruta: Path) -> Configuracion:
     if not isinstance(acciones, list):
         raise ConfigError(f"«{ruta.name}», campo «acciones»: falta la lista de acciones.")
     if not acciones:
-        raise ConfigError(f"«{ruta.name}», campo «acciones»: la lista está vacía.")
+        # La lista puede estar vacía: las órdenes de analizar, organizar,
+        # deshacer, resumir y evaluar trabajan con las «carpetas». Pero avisa,
+        # porque el mínimo del proyecto son tres acciones propias.
+        acciones = []
 
     carpetas = cargar_carpetas(datos) if "carpetas" in datos else []
     por_clave = {c.clave: c for c in carpetas}
 
-    validadas: list[dict] = []
     vistas: set[str] = set()
-    for posicion, accion in enumerate(acciones, start=1):
-        validadas.append(_validar_accion(accion, posicion, vistas, por_clave))
+    validadas = [
+        _validar_accion(accion, posicion, vistas, por_clave)
+        for posicion, accion in enumerate(acciones, start=1)
+    ]
 
-    descargas = _leer_descargas(datos)
-
-    return Configuracion(
-        acciones=validadas,
-        carpetas=carpetas,
-        descargas=descargas,
-        documentos=_leer_documentos(datos),
-    )
-
-
-def _leer_descargas(datos: dict) -> Path:
-    """De dónde salen los ficheros que hay que organizar."""
-    organizador = datos.get("organizador")
-    if organizador is None:
-        return Path(DESCARGAS_POR_DEFECTO).expanduser()
-    if not isinstance(organizador, dict):
-        raise ConfigError("campo «organizador»: debe ser un objeto")
-    descargas = organizador.get("descargas", DESCARGAS_POR_DEFECTO)
-    if not isinstance(descargas, str) or not descargas.strip():
-        raise ConfigError("campo «organizador.descargas»: debe ser una ruta (admite ~)")
-    return Path(descargas).expanduser()
-
-
-def _leer_documentos(datos: dict) -> list[str]:
-    """Qué extensiones se consideran material de estudio."""
-    organizador = datos.get("organizador")
-    if not isinstance(organizador, dict):
-        return list(DOCUMENTOS_POR_DEFECTO)
-    documentos = organizador.get("documentos")
-    if documentos is None:
-        return list(DOCUMENTOS_POR_DEFECTO)
-    if not isinstance(documentos, list) or not all(isinstance(d, str) for d in documentos):
-        raise ConfigError("campo «organizador.documentos»: debe ser una lista de extensiones")
-    return [d.lower() for d in documentos]
-
+    return Configuracion(acciones=validadas, carpetas=carpetas, ruta=ruta)
 
 
 def _validar_accion(
     accion: object,
     posicion: int,
     vistas: set[str],
-    por_clave: dict[str, Carpeta] | None = None,
+    por_clave: dict[str, Carpeta],
 ) -> dict:
     """Valida una acción suelta y devuelve el diccionario."""
     if not isinstance(accion, dict):
@@ -254,9 +186,7 @@ def _validar_accion(
     if "origen" in accion and not isinstance(accion["origen"], str):
         raise AccionNoValida(nombre, "origen", "debe ser una ruta (admite ~)")
 
-    # Una acción puede apuntar a una carpeta y heredar su destino y sus
-    # patrones: así la asignatura se escribe una sola vez.
-    accion = _heredar_de_carpeta(nombre, accion, por_clave or {})
+    accion = _heredar_de_carpeta(nombre, accion, por_clave)
 
     extra = POR_TIPO.get(tipo)
     if extra and not accion.get(extra):
@@ -292,20 +222,15 @@ def _heredar_de_carpeta(nombre: str, accion: dict, por_clave: dict[str, Carpeta]
     carpeta = por_clave.get(clave)
     if carpeta is None:
         raise AccionNoValida(
-            nombre,
-            "carpeta",
-            f"«{clave}» no está en la lista «carpetas» del fichero de acciones",
+            nombre, "carpeta", f"«{clave}» no está en la lista «carpetas» del fichero de acciones"
         )
 
     heredada = dict(accion)
-
     if not heredada.get("destino"):
         heredada["destino"] = str(carpeta.destino)
 
     filtro = dict(heredada.get("filtro") or {})
     if not filtro.get("patron"):
-        # La clave siempre cuenta como patrón: un fichero que ya empieza por
-        # «bbdd_» es interpretable aunque el resto no diga nada.
         alternativas = [carpeta.clave, *carpeta.patrones]
         filtro["patron"] = "(?:" + "|".join(alternativas) + ")"
     heredada["filtro"] = filtro
@@ -313,36 +238,25 @@ def _heredar_de_carpeta(nombre: str, accion: dict, por_clave: dict[str, Carpeta]
     return heredada
 
 
-
 def _validar_plantilla(nombre: str, plantilla: object) -> None:
     """Comprueba que la plantilla solo usa huecos que el motor conoce."""
     if not isinstance(plantilla, str) or not plantilla.strip():
         raise AccionNoValida(nombre, "plantilla", "debe ser un texto no vacío")
 
-    separadores = [c for c in ("/", "\\") if c in plantilla]
-    if separadores:
+    if "/" in plantilla or "\\" in plantilla:
         raise AccionNoValida(
-            nombre,
-            "plantilla",
-            "no puede contener barras: el nombre nuevo tiene que ser un solo fichero, "
-            "no una ruta",
+            nombre, "plantilla", "no puede contener barras: el nombre nuevo tiene que ser un solo fichero"
         )
 
-    valores = {
-        "fecha": datetime(2026, 1, 1),
-        "n": 1,
-        "ext": ".pdf",
-        "nombre": "fichero",
-    }
+    from datetime import datetime
+
+    valores = {"fecha": datetime(2026, 1, 1), "n": 1, "ext": ".pdf", "nombre": "fichero"}
     try:
         resultado = plantilla.format(**valores)
     except KeyError as exc:
         hueco = str(exc).split("'")[1] if "'" in str(exc) else exc
         raise AccionNoValida(
-            nombre,
-            "plantilla",
-            f"usa el hueco «{hueco}», que no existe; los huecos válidos son: "
-            f"{', '.join(HUECOS_PLANTILLA)}",
+            nombre, "plantilla", f"usa el hueco «{hueco}», que no existe"
         ) from exc
     except (IndexError, ValueError) as exc:
         raise AccionNoValida(nombre, "plantilla", f"el formato no es válido: {exc}") from exc
@@ -383,9 +297,7 @@ def _validar_filtro(nombre: str, filtro: object) -> None:
         try:
             re.compile(patron)
         except re.error as exc:
-            raise AccionNoValida(
-                nombre, "filtro.patron", f"expresión regular rota: {exc}"
-            ) from exc
+            raise AccionNoValida(nombre, "filtro.patron", f"expresión regular rota: {exc}") from exc
 
     for campo in ("mas_antiguo_que_dias", "mayor_que_mb"):
         valor = filtro.get(campo)
@@ -393,22 +305,3 @@ def _validar_filtro(nombre: str, filtro: object) -> None:
             continue
         if not isinstance(valor, int) or isinstance(valor, bool) or valor < 0:
             raise AccionNoValida(nombre, f"filtro.{campo}", "debe ser un número entero de 0 o más")
-
-
-def problema_nombre(nombre: str) -> str | None:
-    """Devuelve el motivo por el que un nombre no vale, o None si vale.
-
-    Se comprueba contra las reglas de Windows, que son las más estrictas: un
-    nombre válido en Linux puede ser inválido en el portátil de un compañero.
-    """
-    if not nombre.strip():
-        return "el nombre no puede quedar vacío"
-    if nombre in (".", ".."):
-        return "no puede ser «.» ni «..»"
-    if any(c in CARACTERES_INVALIDOS for c in nombre):
-        return f"no puede llevar ninguno de estos caracteres: {CARACTERES_INVALIDOS}"
-    if nombre.split(".")[0].upper() in NOMBRES_RESERVADOS:
-        return f"«{nombre.split('.')[0]}» es un nombre que Windows reserva"
-    if nombre.endswith(" ") or nombre.endswith("."):
-        return "no puede terminar en espacio ni en punto"
-    return None
