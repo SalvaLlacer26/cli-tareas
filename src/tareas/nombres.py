@@ -26,6 +26,32 @@ PERMITIDOS = re.compile(r"[^a-z0-9]+")
 #: Separador entre la clave de la carpeta y el nombre del fichero.
 SEPARADOR = "_"
 
+#: Extensiones con dos partes. Sin esta lista, «archivo.tar.xz» se convertiría
+#: en «archivo-tar.xz» y dejaría de acabar en «.tar.xz», con lo cual las
+#: acciones que filtran por esa extensión no lo encontrarían.
+EXTENSIONES_COMPUESTAS = (
+    ".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".tar.lz", ".tar.lzma",
+    ".user.js", ".min.js", ".min.css", ".d.ts",
+)
+
+
+def separar_extension(nombre: str) -> tuple[str, str]:
+    """Separa el nombre de su extensión, teniendo en cuenta las compuestas.
+
+    («archivo.tar.xz») -> («archivo», «.tar.xz»)
+    («P1.2. Activitats.pdf») -> («P1.2. Activitats», «.pdf»)
+    """
+    minuscula = nombre.lower()
+    for compuesta in EXTENSIONES_COMPUESTAS:
+        if minuscula.endswith(compuesta):
+            return nombre[: -len(compuesta)], nombre[-len(compuesta):]
+
+    punto = nombre.rfind(".")
+    if punto > 0:
+        return nombre[:punto], nombre[punto:]
+    return nombre, ""
+
+
 
 def sin_acentos(texto: str) -> str:
     """Quita los acentos: «Introducció» -> «Introduccio»."""
@@ -56,11 +82,7 @@ def normalizar(nombre: str, clave: str) -> str:
     se devuelve tal cual: normalizar dos veces no cambia nada.
     """
     nombre = nombre.strip()
-    punto = nombre.rfind(".")
-    if punto > 0:
-        base, extension = nombre[:punto], nombre[punto:]
-    else:
-        base, extension = nombre, ""
+    base, extension = separar_extension(nombre)
 
     clave_slug = slug(clave) or "sin-clave"
 

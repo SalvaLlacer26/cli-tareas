@@ -240,7 +240,9 @@ def organizar(
                 f"«{escape(str(origen))}» se va a vaciar en las carpetas de asignatura. ¿Seguro?",
                 abort=True,
             )
-        organizador = Organizador(configuracion.carpetas)
+        organizador = Organizador(
+            configuracion.carpetas, documentos=configuracion.documentos
+        )
         resultados = organizador.organizar(origen, simular)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")

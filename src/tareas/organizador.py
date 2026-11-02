@@ -21,7 +21,7 @@ import shutil
 from pathlib import Path
 
 from .acciones import ERROR, HECHO, SIMULADO, Resultado, destino_libre
-from .carpetas import Carpeta, clasificar
+from .carpetas import Carpeta, clasificar, de_respaldo
 from .errores import TareasError
 from .manifiesto import Manifiesto
 from .nombres import normalizar
@@ -60,9 +60,15 @@ def _es_resumen_suelto(carpeta: Path, fichero: Path) -> bool:
 class Organizador:
     """Reparte los ficheros de una carpeta entre las carpetas de asignatura."""
 
-    def __init__(self, carpetas: list[Carpeta], manifiesto: Manifiesto | None = None) -> None:
+    def __init__(
+        self,
+        carpetas: list[Carpeta],
+        manifiesto: Manifiesto | None = None,
+        documentos: list[str] | None = None,
+    ) -> None:
         self.carpetas = carpetas
         self.manifiesto = manifiesto if manifiesto is not None else Manifiesto()
+        self.documentos = [d.lower() for d in (documentos or [])]
 
     def organizar(self, origen: Path, simular: bool) -> list[Resultado]:
         """Clasifica y renombra todo lo que hay en «origen»."""
@@ -93,7 +99,17 @@ class Organizador:
     def _organizar_fichero(self, origen: Path, fichero: Path, simular: bool) -> list[Resultado]:
         """Clasifica un fichero (y su resumen, si tiene) y los mueve."""
         resumen = _leer_resumen(origen, fichero.stem)
-        carpeta = clasificar(self.carpetas, fichero.name, resumen)
+
+        if self.documentos and fichero.suffix.lower() not in self.documentos:
+            # Un instalador o una foto no son apuntes, aunque su nombre
+            # coincida con el de una asignatura: van a la carpeta de respaldo.
+            carpeta = de_respaldo(self.carpetas)
+            if carpeta is None:
+                raise TareasError(
+                    "No hay ninguna carpeta de respaldo para lo que no se sepa clasificar"
+                )
+        else:
+            carpeta = clasificar(self.carpetas, fichero.name, resumen)
 
         nombre_nuevo = normalizar(fichero.name, carpeta.clave)
         destino = destino_libre(carpeta.destino / nombre_nuevo)
