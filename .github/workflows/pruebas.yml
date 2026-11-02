@@ -33,7 +33,7 @@ jobs:
         run: |
           uv tool install --editable .
           tareas --help
-          tareas version
+          tareas comandos
 
       - name: Validar el fichero de acciones del repo
         run: uv run tareas validar
