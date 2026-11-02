@@ -6,6 +6,50 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.1.0] — 2026-11-02
+
+Las órdenes `resumir` y `evaluar` ya no son un andamiaje: las escribe un
+modelo de IA.
+
+### Añadido
+
+- **Capa de IA** (`ia.py`): cliente de una API compatible con OpenAI, sin
+  dependencias (solo `urllib`). La configuración se lee de las variables de
+  entorno `TAREAS_IA_URL`, `TAREAS_IA_KEY`, `TAREAS_MODELO`, `TAREAS_IA_CA` y
+  `TAREAS_IA_TIMEOUT`, y de un fichero `.env` en la carpeta de trabajo o en
+  `~/.config/tareas/`.
+- **`.env.example`** documenta las cinco variables. El `.env` está en el
+  `.gitignore` desde el primer commit: la clave no se sube al repo.
+- **`resumir` con IA**: el modelo recibe el texto del documento (el que ya
+  está en la ficha, así que no se vuelve a abrir el PDF) y devuelve un
+  resumen con «Ideas principales», un apartado por tema y tablas donde
+  ayudan. Sale en un `.odt` de unas 3 páginas, sin imágenes.
+- **`evaluar` con IA**: preguntas de tipo test con **alternativas reales** y
+  la respuesta marcada, preguntas de desarrollo y problemas de cálculo, todo
+  en el idioma del documento y con las soluciones al final.
+- **`markdown.py`**: convierte la respuesta del modelo en las secciones del
+  documento, con encabezados de dos niveles, listas con viñeta, tablas con
+  tabuladores y negritas de verdad en el `.odt` y el `.docx`.
+- **26 pruebas nuevas** (109 en total): la capa de IA con la llamada
+  simulada, la conversión de Markdown y el modo sin red.
+
+### Corregido
+
+- Las pruebas **ya no llaman a la red**: antes, con la IA configurada, la
+  suite tardaba dos minutos y gastaba créditos. Ahora la configuración de la
+  IA se aparta en un fixture automático y la suite tarda 0,8 segundos.
+- El detector de definiciones ya no busca «es» o «son», que en castellano
+  aparecen en casi todas las frases y convertían los ejercicios en un churro.
+  Ahora busca formas de definición claras («se define», «consiste en»).
+- El título del documento salía duplicado en el `.odt` y el `.docx`.
+
+### Cambiado
+
+- Las limitaciones documentadas en la v2.0.1 («resumir y evaluar no
+  funcionan correctamente») **quedan resueltas**: las dos órdenes hacen ya su
+  trabajo. Lo que queda documentado es que tardan (entre 1 y 4 minutos con
+  los modelos del centro) y que sin modelo hacen una versión extractiva.
+
 ## [v2.0.1] — 2026-11-02
 
 ### Documentado

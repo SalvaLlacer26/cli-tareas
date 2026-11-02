@@ -42,6 +42,25 @@ Raíz: `{"version": 1, "acciones": [...], "carpetas": [...]}`.
 - Compara nombres **normalizados a NFC** (`nombres.mismo_nombre`): un fichero en NFD y el nombre tecleado en NFC se ven iguales pero no lo son.
 - Si cambias el esquema de la ficha `.md`, actualiza `ficha.py` **y** el README: la leen cuatro órdenes.
 
+## La capa de IA
+
+- `ia.py` es el **único** módulo que habla con el servidor de modelos. Ningún
+  otro abre una conexión.
+- La configuración sale de `TAREAS_IA_URL`, `TAREAS_IA_KEY`, `TAREAS_MODELO`,
+  `TAREAS_IA_CA` y `TAREAS_IA_TIMEOUT`, o de un `.env`. **La clave nunca se
+  escribe en el repo**: el `.env` está en el `.gitignore` desde el primer
+  commit y hay un `.env.example` que lo documenta.
+- Si no hay clave o no hay red, se lanza `ErrorIA` con un mensaje de **una
+  línea**. La CLI lo captura y cae a la versión extractiva: **ninguna orden
+  puede reventar con una traza** por un problema de red.
+- **Las pruebas no salen a la red.** El fixture automático de
+  `tests/conftest.py` aparta la configuración de la IA; la llamada al
+  servidor se simula en `tests/test_ia.py`. Las pruebas que sí necesitan el
+  modelo de verdad van marcadas con `@pytest.mark.ia` y solo se ejecutan con
+  `uv run pytest -m ia`.
+- El modelo devuelve Markdown; `markdown.py` lo traduce a las secciones del
+  documento. Si cambias el formato de la respuesta, cambia también ese módulo.
+
 ## Trampas conocidas
 
 - `patron` se evalúa sobre el **nombre completo** del fichero, con la extensión, y **sin distinguir mayúsculas**.
