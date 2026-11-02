@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .carpetas import Carpeta, cargar_carpetas
 from .errores import AccionNoValida, ConfigError
+from platformdirs import user_config_dir
 
 #: Tipos de acción que el motor sabe ejecutar.
 TIPOS = ("mover", "copiar", "renombrar", "borrar")
@@ -57,6 +58,31 @@ RE_NOMBRE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 #: Carpeta de descargas por defecto, si el fichero de acciones no dice otra cosa.
 DESCARGAS_POR_DEFECTO = "~/Downloads"
 
+#: Nombre del fichero de acciones por defecto.
+ARCHIVO_POR_DEFECTO = "acciones.json"
+
+#: Extensiones que se consideran material de estudio. Un instalador o una
+#: foto no son apuntes, aunque su nombre coincida con el de una asignatura.
+DOCUMENTOS_POR_DEFECTO = (
+    ".pdf", ".docx", ".doc", ".odt", ".odp", ".ods", ".pptx", ".ppt",
+    ".txt", ".md", ".rtf", ".epub", ".html", ".htm", ".xml", ".csv",
+    ".odb", ".fodt", ".fodp", ".sxw",
+)
+
+
+def ruta_de_usuario() -> Path:
+    """El fichero de acciones de la configuración del usuario.
+
+    Se busca aquí cuando no hay un «acciones.json» en la carpeta desde la que
+    se lanza la orden, para que la herramienta se pueda usar desde cualquier
+    sitio sin tener que pasar --config cada vez.
+
+    - Linux/macOS: ``~/.config/tareas/acciones.json``
+    - Windows: ``%APPDATA%\\tareas\\acciones.json``
+    """
+    return Path(user_config_dir("tareas")) / ARCHIVO_POR_DEFECTO
+
+
 
 @dataclass
 class Configuracion:
@@ -65,6 +91,7 @@ class Configuracion:
     acciones: list[dict] = field(default_factory=list)
     carpetas: list[Carpeta] = field(default_factory=list)
     descargas: Path = field(default_factory=lambda: Path(DESCARGAS_POR_DEFECTO).expanduser())
+    documentos: list[str] = field(default_factory=lambda: list(DOCUMENTOS_POR_DEFECTO))
 
 
 
@@ -80,12 +107,22 @@ def cargar(ruta: Path) -> list[dict]:
 
 
 def cargar_config(ruta: Path) -> Configuracion:
-    """Lee el fichero de acciones entero: acciones, carpetas y carpeta de descargas."""
+    """Lee el fichero de acciones entero: acciones, carpetas y carpeta de descargas.
+
+    Si la ruta no existe y es la de por defecto, se busca el fichero de
+    acciones de la configuración del usuario. Si tampoco está, se dice dónde
+    se puede poner.
+    """
     ruta = ruta.expanduser()
     if not ruta.is_file():
-        raise ConfigError(
-            f"No encuentro «{ruta}». Crea acciones.json o usa --config RUTA para otro fichero."
-        )
+        propia = ruta_de_usuario()
+        if propia.is_file() and ruta.name == ARCHIVO_POR_DEFECTO:
+            ruta = propia
+        else:
+            raise ConfigError(
+                f"No encuentro «{ruta}». Crea acciones.json, usa --config RUTA para otro "
+                f"fichero, o pon uno en «{propia}» para usarlo desde cualquier carpeta."
+            )
 
     try:
         # utf-8-sig lee igual con BOM que sin BOM: el Bloc de notas de Windows
@@ -133,7 +170,12 @@ def cargar_config(ruta: Path) -> Configuracion:
 
     descargas = _leer_descargas(datos)
 
-    return Configuracion(acciones=validadas, carpetas=carpetas, descargas=descargas)
+    return Configuracion(
+        acciones=validadas,
+        carpetas=carpetas,
+        descargas=descargas,
+        documentos=_leer_documentos(datos),
+    )
 
 
 def _leer_descargas(datos: dict) -> Path:
@@ -147,6 +189,19 @@ def _leer_descargas(datos: dict) -> Path:
     if not isinstance(descargas, str) or not descargas.strip():
         raise ConfigError("campo «organizador.descargas»: debe ser una ruta (admite ~)")
     return Path(descargas).expanduser()
+
+
+def _leer_documentos(datos: dict) -> list[str]:
+    """Qué extensiones se consideran material de estudio."""
+    organizador = datos.get("organizador")
+    if not isinstance(organizador, dict):
+        return list(DOCUMENTOS_POR_DEFECTO)
+    documentos = organizador.get("documentos")
+    if documentos is None:
+        return list(DOCUMENTOS_POR_DEFECTO)
+    if not isinstance(documentos, list) or not all(isinstance(d, str) for d in documentos):
+        raise ConfigError("campo «organizador.documentos»: debe ser una lista de extensiones")
+    return [d.lower() for d in documentos]
 
 
 
