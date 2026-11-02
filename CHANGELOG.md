@@ -6,6 +6,66 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.0.0] — 2026-11-02
+
+Reformulación completa de la herramienta. Ahora el trabajo se hace en tres
+pasos (`analizar` → `organizar` → `deshacer`), y de los documentos se sacan
+resúmenes y ejercicios.
+
+### Añadido
+
+- **`tareas analizar [CARPETA]`**: analiza el contenido de cada documento,
+  renombra los que tienen nombres incompatibles y escribe una ficha `.md` por
+  documento en la carpeta oculta `md`, con el nombre original, la asignatura
+  detectada, la carpeta de destino y el texto extraído. Al final enseña una
+  tabla con la clasificación de cada fichero y pide que confirmes que el
+  análisis se ha hecho bien.
+- **`tareas organizar [CARPETA]`**: reparte los documentos según las fichas y
+  les devuelve el nombre original. La ficha viaja con su documento, en la
+  carpeta `md` de la asignatura.
+- **`tareas deshacer [CARPETA]`**: devuelve los documentos a su carpeta de
+  origen con su nombre original. Las fichas se conservan.
+- **`tareas resumir 'ARCHIVO' [CARPETA]`**: crea un resumen de diez páginas
+  como máximo, sin imágenes y con el texto organizado en apartados, en la
+  carpeta `resumenes` y con el nombre `ARCHIVO_resumido`.
+- **`tareas evaluar 'ARCHIVO' [CARPETA]`**: crea una batería de ejercicios
+  (tipo test, desarrollo y cálculo) en la carpeta `ejercicios` y con el nombre
+  `ARCHIVO_test`.
+- **`tareas comandos`**: lista todos los comandos, cómo se usan y para qué
+  sirven, con el autor, el curso, el año y el aviso legal.
+- **La ficha `.md`** es el portador de datos: la leen `organizar`, `deshacer`,
+  `resumir` y `evaluar`, así que el documento pesado no se vuelve a abrir.
+- **Escritores de documentos** sin dependencias: `.odt` (LibreOffice), `.docx`
+  (Word), `.rtf` (WordPad) y `.txt` (Bloc de notas). El formato se elige
+  según el sistema operativo. Los `.odt` y los `.docx` son ficheros ZIP con el
+  XML dentro, y se generan con la biblioteca estándar.
+- **Clasificación por evidencia**: gana la carpeta que aporta más, contando
+  que un patrón de varias palabras pesa más que uno corto y que lo que está
+  en el título del documento pesa el doble que una mención suelta.
+- **Todos los comandos admiten la carpeta como argumento** y, si no se pone,
+  trabajan sobre la carpeta en la que está la terminal.
+
+### Corregido
+
+- **Los nombres en NFD no se encontraban.** Un fichero guardado con la «ó» como
+  «o» + acento combinante (NFD, como los de macOS) y el nombre tecleado en
+  NFC se ven iguales pero no lo son. Ahora todas las comparaciones de nombres
+  se normalizan a NFC.
+- **`sin_conflicto` devolvía solo el nombre**, así que al mover un documento a
+  su carpeta de destino lo dejaba en el directorio desde el que se ejecutaba la
+  orden.
+- **La ficha se escribía fuera de la carpeta `md`** al renombrar un documento.
+- Los `.md` que ya estaban en la carpeta se quedaban sin organizar: ahora se
+  analizan y se mueven con el resto.
+
+### Cambiado
+
+- La versión pasa a 2.0.0 porque el cambio de la interfaz es incompatible con
+  la anterior: los comandos `version`, `listar` y `acciones` desaparecen y los
+  nuevos son `analizar`, `organizar`, `deshacer`, `resumir`, `evaluar` y
+  `comandos`. Se mantienen `validar` y `ejecutar` para las acciones genéricas
+  del fichero de configuración.
+
 ## [v1.2.0] — 2026-11-02
 
 Pequeños arreglos y comodidades después de probar la herramienta con los

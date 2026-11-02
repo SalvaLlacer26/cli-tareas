@@ -386,4 +386,70 @@ barato, no lo caro.
   que no se puede saber de ningún sitio, se dice con claridad: la carpeta de
   respaldo.
 
+---
+
+## 2026-11-02 · Reformulación: analizar → organizar → deshacer
+
+**Petición:** cambiar el CLI entero. Seis órdenes: `analizar`, `organizar`,
+`deshacer`, `resumir`, `evaluar` y `comandos`. Todas admiten la carpeta como
+argumento y, si no se pone, trabajan sobre la de la terminal.
+
+**Lo primero que hice fue mirar los datos de verdad.** En `~/Baixades` había 41
+ficheros: PDF con sus `.md` al lado. Y al mirar el contenido de los `.md` se
+vio algo que cambió el diseño:
+
+| Fichero | Por el nombre | Por su contenido |
+|---|---|---|
+| `P1.2. Activitats.pdf` | nada | **bbdd** («Introducció a les BBDD») |
+| `Activitat_PRI_01.pdf` | nada | **intermodular** («Projecte Intermodular 1DAW») |
+| `Salva_Llacer.pdf` | nada | **sistemes** («SISTEMES INFORMÀTICS») |
+| `Ud1. Introducción a las Bases de Datos.pdf` | nada | **bbdd** |
+| `Veure este document per ajudar-te en la tasca 4.pdf` | nada | **bbdd** («crear una base de datos en LibreOffice Base») |
+
+Cinco de los que el nombre no explicaba, el contenido sí. Así que `analizar`
+**lee el contenido de verdad**, no solo el nombre.
+
+**Decisiones que tomé:**
+
+1. **La ficha .md es el portador de datos.** `analizar` la escribe en la
+   carpeta `md`, y `organizar`, `deshacer`, `resumir` y `evaluar` la leen. Así
+   el PDF de 300 páginas se abre **una sola vez**, y el resumen se hace sin
+   tocarlo. Es la versión buena de la idea del principio.
+2. **El renombrado es temporal.** `analizar` limpia los nombres incompatibles
+   (tildes, espacios) y `organizar` **devuelve el nombre original** al mover
+   el documento. El nombre limpio solo sirve para trabajar.
+3. **La clasificación cuenta evidencia, no aciertos.** Al principio ganaba la
+   primera carpeta que coincidía, y «Activitat_PRI_01» iba a Entornos porque
+   el documento menciona «github». Ahora gana la que aporta más: una frase
+   («projecte intermodular») pesa 3, una palabra corta 1, y lo que está en el
+   título del documento pesa el doble. Con eso, el fichero va a intermodular.
+4. **Un solo golpe no basta para clasificar por el contenido.** «ide» dentro
+   de una frase no convierte un manual de placa base en apuntes de Entornos:
+   por el contenido hacen falta 2 puntos.
+
+**Tres bugs reales que aparecieron y se arreglaron:**
+
+- **`sin_conflicto` devolvía solo el nombre**, no la ruta. Al mover un
+  documento a su carpeta de destino lo dejaba en el directorio desde el que se
+  ejecutaba la orden. Lo encontraron las pruebas, no yo.
+- **La ficha se escribía fuera de la carpeta `md`**, porque al cambiar
+  `sin_conflicto` el nombre compatible pasó a ser un `Path` y al construir la
+  ruta de la ficha ganaba el componente absoluto.
+- **Los nombres en NFD no se encontraban.** Los ficheros de `Baixades` tienen
+  la «ó» como «o» + acento combinante (NFD), y lo que se teclea está en NFC:
+  se ven iguales pero no lo son, así que `resumir 'A21_IntroduccióGit_GitHub.pdf'`
+  no encontraba su ficha. Ahora todas las comparaciones normalizan a NFC.
+  Esto lo habría dado el profesor en la defensa si no lo hubiera cazado.
+
+**Qué aprendí:**
+
+- Cuando la especificación dice «analiza el contenido», hay que leer el
+  contenido. Cinco de los ficheros de la carpeta no se clasificaban por su
+  nombre y sí por su texto.
+- Una estructura de datos que se escribe una vez y se lee muchas veces (la
+  ficha) vale más que volver a abrir el fichero cada vez.
+- Las comparaciones de nombres tienen que normalizarse. Es el primer bug que
+  aparece en macOS y en cualquier fichero que venga de un navegador.
+
+
 

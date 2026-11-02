@@ -1,10 +1,13 @@
 # tareas
 
-Mi herramienta de línea de órdenes para automatizar tareas repetitivas con ficheros.
+**Tu propia herramienta de terminal: organiza tus apuntes por asignatura.**
 
-`tareas` lee un fichero de configuración (`acciones.json`) donde **yo** describo qué
-acciones hace, y las ejecuta sobre mis ficheros reales. Añadir una acción nueva es
-editar un JSON, no tocar código.
+`tareas` lee una carpeta, analiza el contenido de cada documento, decide de qué
+asignatura es cada uno y lo mueve a su carpeta. Todo está descrito en un
+fichero de configuración (`acciones.json`) que escribes tú, así que añadir una
+asignatura no es tocar código.
+
+Creada por **Salvador Llácer Ivars** · 1º DAM · 2026
 
 ## Instalación
 
@@ -24,200 +27,143 @@ uv tool install git+https://github.com/SalvaLlacer26/cli-tareas
 ### Configuración de usuario
 
 Por defecto, `acciones.json` se busca en la carpeta desde la que lanzas la
-orden. Si quieres usarlo desde cualquier sitio, pon una copia en tu carpeta de
-configuración:
+orden. Si quieres usarlo desde cualquier sitio:
 
 ```bash
 mkdir -p ~/.config/tareas
 cp acciones.json ~/.config/tareas/acciones.json
 ```
 
-A partir de ahí, `tareas organizar` funciona desde cualquier carpeta. (En
-Windows la ruta es `%APPDATA%\tareas\`.)
+(En Windows la ruta es `%APPDATA%\tareas\`.)
 
-Para desarrollar (recarga los cambios al instante):
+## Los comandos
 
-```bash
-uv sync
-uv run tareas --help
-uv run pytest
-```
-
-## Comandos
+`tareas comandos` te los explica todos. Resumen:
 
 | Comando | Qué hace |
 |---|---|
-| `tareas --help` | Ayuda general: todos los comandos y sus opciones. |
-| `tareas version` | Muestra la versión instalada (`tareas 1.0.0`). |
-| `tareas listar [CARPETA]` | Tabla con nombre, tipo, tamaño y fecha de cada fichero. Por defecto, la carpeta actual. |
-| `tareas acciones` | Lista las acciones definidas en `acciones.json` con su descripción, y las carpetas de destino. |
-| `tareas validar` | Comprueba `acciones.json` y dice exactamente qué campo falla. Sale con código 3 si está mal. |
-| `tareas ejecutar NOMBRE [CARPETA] --simular` | Ejecuta una acción. Con `--simular` enseña qué haría sin tocar nada. Con `--si` no pregunta. |
-| **`tareas organizar [CARPETA] --simular`** | **Reparte todo lo que hay en la carpeta de descargas entre las carpetas de asignatura, renombrando cada fichero a un formato que la herramienta entiende.** |
-| **`tareas desorganizar [CARPETA] --simular`** | **Deshace lo anterior: devuelve los ficheros clasificados a la carpeta de descargas con su nombre original.** |
+| `tareas analizar [CARPETA]` | Analiza la carpeta y el contenido de cada fichero, renombra los que tienen nombres incompatibles y escribe una ficha `.md` por documento con los datos para clasificarlo. Muestra una tabla con la asignatura de cada fichero y pide que confirmes el análisis. |
+| `tareas organizar [CARPETA]` | Mueve cada documento a la carpeta de su asignatura usando las fichas, y le devuelve el nombre original. Muestra un resumen. |
+| `tareas deshacer [CARPETA]` | Deshace lo anterior: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
+| `tareas resumir 'ARCHIVO' [CARPETA]` | Crea un resumen del archivo (10 páginas como máximo, sin imágenes, organizado en apartados) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. |
+| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea una batería de ejercicios (tipo test, desarrollo y cálculo) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. |
+| `tareas comandos` | Lista todos los comandos, cómo se usan y para qué sirven. |
+| `tareas validar` | Comprueba el fichero de configuración y dice qué campo falla. |
+| `tareas ejecutar NOMBRE [CARPETA]` | Ejecuta una de las acciones del fichero de configuración. |
 
-Las dos últimas son el ciclo completo:
+**Todos aceptan la carpeta como argumento.** Si no la pones, se trabaja sobre
+la carpeta en la que estás en la terminal:
 
 ```bash
-tareas organizar      --simular   # enseña qué haría
-tareas organizar                   # lo hace
-tareas desorganizar --simular      # y si te has equivocado, lo deshaces
+cd ~/Descargas
+tareas analizar        # trabaja en ~/Descargas
+tareas organizar       # y en ~/Descargas también
 ```
 
-### `tareas organizar`
+## El ciclo completo
 
-Reparte los ficheros de la carpeta de descargas (por defecto, la que dice
-`organizador.descargas` en `acciones.json`) entre las carpetas de asignatura.
+```bash
+cd ~/Descargas
 
-Para cada fichero:
-
-1. **Se busca la asignatura** por el nombre del fichero. Gana la carpeta con
-   **más** patrones que aparecen, no la primera que coincide: así
-   «Projecte Intermodular 1DAW» (que contiene «projecte» *y* «github») acaba en
-   intermodular y no en entornos.
-2. **Si el nombre no dice nada**, se mira el resumen de texto que va al lado
-   (`fichero.md`). Es un fichero de texto de un par de kilobytes, así que leerlo
-   es mucho más barato que abrir el PDF. `Salva_Llacer.pdf` no dice nada, pero
-   su resumen empieza con «SISTEMES INFORMÀTICS» y con eso se clasifica solo.
-3. **Si tampoco hay resumen**, el fichero va a la carpeta de respaldo
-   (`Sin clasificar`).
-4. **Se renombra** al formato canónico: `clave_asignatura` + nombre limpio.
-
-```
-Pràctica 1. Entitats, atributs i valors.pdf  ->  bbdd_practica-1-entitats-atributs-i-valors.pdf
-P1.2. Activitats.pdf                         ->  bbdd_p1-2-activitats.pdf
-Salva_Llacer.pdf                             ->  sistemes_salva-llacer.pdf
-Activitat_PRI_01.pdf                         ->  intermodular_activitat-pri-01.pdf
+tareas analizar        # lee, renombra lo que estorba y hace las fichas
+tareas organizar       # reparte por asignatura y devuelve los nombres
+tareas deshacer        # si te has equivocado, todo vuelve a su sitio
 ```
 
-El resumen de texto (`fichero.md`) se mueve con su documento.
+### 1 · `analizar`
 
-**El nombre nuevo es interpretable**: como empieza por la clave de la
-asignatura, las acciones con patrón (`apuntes-bases-dades`, etc.) lo
-reconocen sin tocar nada. Es el ciclo completo: el nombre deja de ser un
-galimatías y pasa a decir de qué asignatura es el fichero.
+Por cada documento:
 
-### `tareas desorganizar`
+1. **Se extrae el texto.** Los PDF se leen con `pdftotext` (solo las
+   primeras páginas, así que un PDF de 300 páginas no se carga entero); los
+   `.docx` y los de OpenOffice se leen descomprimiendo el ZIP; los de texto,
+   directamente. Lo que no se puede leer (un `.deb`, una imagen, un PDF
+   escaneado) se marca como **formato invalido**.
+2. **Se renombra** si el nombre no es compatible. Un nombre con tildes,
+   espacios o caracteres raros se limpia (`Pràctica 1. Entitats.pdf` →
+   `Practica-1-Entitats.pdf`). El nombre original se guarda en la ficha, así
+   que luego se devuelve.
+3. **Se clasifica** por el nombre del fichero y, si el nombre no dice nada,
+   por su contenido. Gana la carpeta con más evidencia, contando que un
+   patrón de varias palabras pesa más que uno corto, y que lo que está en el
+   título del documento pesa el doble que una mención suelta.
+4. **Se escribe una ficha** `.md` en la carpeta oculta `md`, con el nombre
+   original, la asignatura detectada, la carpeta de destino y el texto
+   extraído.
 
-Devuelve todos los ficheros de las carpetas de asignatura a la carpeta de
-descargas **con el nombre que tenían antes**. Para eso hay un manifiesto
-(`~/.local/state/tareas/manifiesto.json` en Linux) que recuerda de dónde salió
-cada fichero. Si el manifiesto no está, los ficheros vuelven igualmente, pero
-con el nombre normalizado.
+Al final se muestra la tabla y te pide que confirmes:
 
+```
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Archivo          ┃ Estado        ┃ Asignatura       ┃ Carpeta de destino  ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ Actividad_CSS.pdf│ clasificado   │ Llenguatge de…   │ ~/Documents/Llengu… │
+│ Salva_Llacer.pdf │ clasificado   │ Sistemes info…   │ ~/Documents/Siste…  │
+│ foto.png         │ formato inval… │ formato invalido │ —                    │
+└───────────────────┴───────────────┴──────────────────┴──────────────────────┘
+Fichas creadas: 27 en «md» · 27 analizables · 1 sin clasificar · 0 con formato inválido
+```
 
-## Spec (versión 1 · 2026-10-27)
+### 2 · `organizar`
 
-1. **Problema:** cada semana pierdo tiempo ordenando la carpeta de descargas: PDFs
-   de seis asignaturas mezclados con instaladores, comprimidos y capturas, y nunca
-   sé cuál va a su carpeta.
-2. **Para quién:** para mí y para mi compañero de clase, que tiene los mismos seis
-   apuntes de 1º DAM.
-3. **Cómo se usa:** `tareas ORDEN [CARPETA] [opciones]` desde cualquier terminal.
-4. **Órdenes de la semana 1:** `tareas --help`, `tareas version`, `tareas listar [CARPETA]`.
-5. **Órdenes previstas:** `tareas acciones`, `tareas validar`, `tareas ejecutar NOMBRE --simular`.
-6. **Mis acciones:** repartir apuntes por asignatura (6), separar instaladores,
-   renombrar capturas con su fecha, borrar temporales viejos, copiar una copia de
-   seguridad de los apuntes.
-7. **Nunca hará:** borrar sin preguntar ni tocar ficheros fuera de la carpeta que le
-   indique. Antes de tocar nada, `--simular`.
-8. **Plataformas:** Linux primero; también Windows y macOS (pathlib, `encoding="utf-8"`,
-   nada de `shell=True`).
-9. **Códigos de salida:** 0 bien · 1 fallo al ejecutar · 2 uso incorrecto · 3 configuración inválida.
-10. **Instalación:** `uv tool install --editable .`
+Lee las fichas, mueve cada documento a la carpeta de su asignatura **y le
+devuelve el nombre original** (el renombrado era solo para trabajar cómodo) y
+lleva la ficha con él, en la carpeta `md` de la asignatura.
 
-Códigos de salida: **0** bien · **1** fallo al ejecutar · **2** error de uso · **3** configuración inválida.
+### 3 · `deshacer`
+
+Devuelve los documentos a su carpeta de origen, con su nombre original. Las
+fichas vuelven a la carpeta `md` de origen: el análisis se conserva y se puede
+volver a organizar sin analizar otra vez.
+
+### 4 · `resumir` y `evaluar`
+
+Trabajan sobre lo que ya hay en la ficha, así que no vuelven a abrir el
+documento. El formato del fichero que se crea depende del sistema operativo:
+
+| Sistema | Formato | Programa |
+|---|---|---|
+| Linux | `.odt` | LibreOffice |
+| Windows y macOS | `.docx` | Word |
+| Cualquiera | `.rtf` | WordPad |
+| Cualquiera | `.txt` | Bloc de notas |
+
+Los `.odt` y los `.docx` se generan con la biblioteca estándar (son ficheros
+ZIP con el XML dentro), así que no hace falta instalar nada para escribirlos.
 
 ## Esquema de acciones.json
-
-`acciones.json` es la parte que escribo yo. El código solo trae el motor que lo
-interpreta. Referencia completa de campos en [`docs/adr/0001-configuracion-externa.md`](docs/adr/0001-configuracion-externa.md).
 
 ### Raíz
 
 | Campo | Obligatorio | Tipo | Qué hace |
 |---|---|---|---|
-| `version` | sí | entero | Versión del esquema. Si cambia el formato, sube a 2. |
-| `acciones` | sí | lista | Las acciones. Vacía = error de configuración. |
-| `carpetas` | no | lista | Las carpetas de destino (asignaturas). Sin esta sección no hay nada que organizar. |
-| `organizador` | no | objeto | Dónde está la carpeta de descargas. |
+| `version` | sí | entero | Versión del esquema. |
+| `acciones` | sí | lista | Las acciones genéricas. Puede estar vacía. |
+| `carpetas` | no | lista | Las asignaturas: dónde va cada una y cómo se reconoce. |
 
 ### `carpetas`: las asignaturas
 
-Cada carpeta es una asignatura. Es la fuente de verdad: la clave, el destino y
-los patrones se escriben **una sola vez**, y las acciones que apuntan a ella
-lo heredan.
-
 | Campo | Obligatorio | Tipo | Qué hace |
 |---|---|---|---|
-| `clave` | sí | texto | Identificador corto que se pone delante del nombre del fichero (`bbdd`, `sistemes`). Es lo que hace el nombre interpretable. |
-| `etiqueta` | no | texto | El nombre que ve la persona. Si falta, se usa la clave. |
+| `clave` | sí | texto | Identificador corto de la asignatura (`bbdd`, `sistemes`). |
+| `etiqueta` | no | texto | El nombre que ve la persona. |
 | `destino` | sí | ruta | La carpeta donde van los ficheros. Admite `~`. |
-| `patrones` | no | lista | Palabras o expresiones que señalan esa asignatura. Se cuentan, no se aplica el primero que coincida. |
+| `patrones` | no | lista | Palabras o expresiones que la señalan. Se **cuentan** y se ponderan: una frase pesa más que una palabra suelta. |
 | `respaldo` | no | booleano | `true` en la carpeta que recibe lo que no se ha podido clasificar. |
 
-### `organizador`
-
-| Campo | Tipo | Qué hace |
-|---|---|---|
-| `descargas` | ruta | De dónde saca los ficheros `tareas organizar`. Admite `~`. |
-| `documentos` | lista | Qué extensiones se consideran material de estudio. Lo que no sea un documento (un `.tar.xz`, un `.deb`, una foto) va a la carpeta de respaldo aunque su nombre coincida con el de una asignatura. |
-
-### Cada acción
+### `acciones`
 
 | Campo | Obligatorio | Tipo | Qué hace |
 |---|---|---|---|
-| `nombre` | sí | texto | Lo que escribes en `tareas ejecutar NOMBRE`. Único, en minúsculas y con guiones. |
-| `descripcion` | sí | texto | Lo que enseña `tareas acciones`. Una frase para alguien que no eres tú. |
+| `nombre` | sí | texto | Lo que escribes en `tareas ejecutar NOMBRE`. |
+| `descripcion` | sí | texto | Lo que enseña `tareas acciones`. |
 | `tipo` | sí | `mover` \| `copiar` \| `renombrar` \| `borrar` | Qué clase de acción es. |
-| `carpeta` | no | texto | Clave de una carpeta de la sección «carpetas». La acción hereda su `destino` y sus `patrones`. |
-| `origen` | no | ruta | Carpeta por defecto si no pasas CARPETA en la orden. Admite `~`. |
-| `filtro` | no | objeto | Qué ficheros le afectan (ver más abajo). Sin filtro = todos. |
-| `destino` | `mover`/`copiar` | ruta | A dónde van. Si no existe, se crea al ejecutar de verdad. |
-| `plantilla` | `renombrar` | texto | El nombre nuevo (ver huecos más abajo). |
-| `confirmar` | `borrar` | booleano | `true` pide confirmación antes de actuar, salvo que pases `--si`. Las acciones de tipo `borrar` siempre piden confirmación: no se puede desactivar. |
-
-### Filtros (dentro de `filtro`)
-
-Si pones varios, el fichero tiene que cumplirlos **todos**.
-
-| Campo | Tipo | Qué hace |
-|---|---|---|
-| `extensiones` | lista | Solo esas extensiones, comparadas en minúsculas (`FOTO.JPG` entra en `.jpg`). Se comparan por sufijo del nombre, así que `".tar.gz"` también funciona. |
-| `patron` | regex | Expresión regular sobre el nombre del fichero, **sin distinguir mayúsculas**. En JSON la `\` se escribe `\\`. |
-| `mas_antiguo_que_dias` | entero | Solo ficheros modificados hace más de N días. |
-| `mayor_que_mb` | entero | Solo ficheros de más de N MB. |
-
-El filtro **no baja a las subcarpetas**: solo mira el primer nivel de la carpeta.
-
-### Huecos de `plantilla` (para `renombrar`)
-
-| Hueco | Ejemplo | Qué pone |
-|---|---|---|
-| `{fecha:%Y-%m-%d}` | `2026-11-03` | Fecha de modificación del fichero, con el formato que quieras. |
-| `{n:03}` | `001` | Contador con ceros a la izquierda. |
-| `{ext}` | `.jpg` | La extensión original, con punto y en minúsculas. |
-| `{nombre}` | `IMG_2041` | El nombre original sin extensión. |
-
-### Mis acciones
-
-| Nombre | Tipo | Qué hace |
-|---|---|---|
-| `apuntes-bases-dades` | mover | Apuntes de Bases de Datos a su carpeta, según el nombre del fichero. |
-| `apuntes-entorns` | mover | Apuntes de Entornos de Desenvolupament a su carpeta. |
-| `apuntes-marcs` | mover | Apuntes de Llenguatge de Marques a su carpeta. |
-| `apuntes-programacio` | mover | Apuntes de Programació a su carpeta. |
-| `apuntes-intermodular` | mover | Apuntes del Projecte Intermodular a su carpeta. |
-| `apuntes-sistemes` | mover | Apuntes de Sistemes Informàtics a su carpeta. |
-| `separar-instaladores` | mover | Instaladores y paquetes a una subcarpeta aparte. |
-| `renombrar-capturas` | renombrar | Capturas y fotos con su fecha: `2026-10-27_001.png`. |
-| `limpiar-temporales` | borrar | Ficheros `.tmp` con más de 30 días (pide confirmación). |
-| `copiar-copia-apuntes` | copiar | Copia de seguridad de los apuntes en otra carpeta. |
-
-Las seis primeras usan `filtro.patron` para reconocer la asignatura **por el nombre
-del fichero**. Es una decisión consciente: si el nombre no dice nada (por ejemplo
-`Salva_Llacer.pdf`), el fichero **no se mueve**. Prefiero dejar un archivo en
-Descargas a mandarlo a la carpeta equivocada.
+| `carpeta` | no | texto | Clave de una carpeta: la acción hereda su `destino` y sus `patrones`. |
+| `origen` | no | ruta | Carpeta por defecto. Admite `~`. |
+| `filtro` | no | objeto | `extensiones`, `patron`, `mas_antiguo_que_dias`, `mayor_que_mb`. |
+| `destino` | `mover`/`copiar` | ruta | A dónde van. |
+| `plantilla` | `renombrar` | texto | El nombre nuevo: `{fecha:%Y-%m-%d}`, `{n:03}`, `{ext}`, `{nombre}`. |
+| `confirmar` | `borrar` | booleano | Las acciones que borran siempre preguntan. |
 
 ## Estructura
 
@@ -227,7 +173,7 @@ cli-tareas/
 ├── README.md
 ├── .gitignore              # .venv/, __pycache__/, .env
 ├── .gitattributes          # * text=auto
-├── acciones.json           # MIS acciones (lo escribo yo)
+├── acciones.json           # la configuración: asignaturas y acciones
 ├── docs/
 │   ├── adr/0001-configuracion-externa.md
 │   └── prompts.md
@@ -240,48 +186,39 @@ cli-tareas/
 ├── src/tareas/
 │   ├── __init__.py         # __version__
 │   ├── __main__.py         # python -m tareas
-│   ├── cli.py              # interfaz Typer: órdenes, opciones, salida
+│   ├── cli.py              # interfaz Typer: las órdenes
+│   ├── comandos.py         # la ficha de cada orden (para «tareas comandos»)
 │   ├── config.py           # leer y VALIDAR acciones.json
-│   ├── motor.py            # clase Motor: ejecuta una Accion sobre una carpeta
-│   ├── acciones.py         # clases Accion (mover, renombrar, copiar, borrar…)
+│   ├── analizador.py       # analizar: renombrar, extraer, clasificar, fichas
+│   ├── clasificador.py     # qué asignatura es cada documento
+│   ├── contenido.py        # extraer texto de PDF, DOCX, ODT, TXT…
+│   ├── ficha.py            # el formato de la ficha .md
+│   ├── nombres.py          # qué nombres son compatibles y cómo se limpian
+│   ├── organizador.py      # organizar y deshacer
+│   ├── documentos.py       # escribir .odt, .docx, .rtf y .txt
+│   ├── resumen.py          # el resumen
+│   ├── evaluacion.py       # los ejercicios
+│   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)
+│   ├── motor.py            # el motor de las acciones genéricas
 │   └── errores.py          # TareasError, ConfigError, AccionNoValida
-├── prototipo/              # v0 de un script, ya sustituido por esta CLI
-└── pruebas/                # acciones.json de prueba, con rutas en ~/pruebas-tareas
+└── tests/                  # 83 pruebas
 ```
 
-## Prototipo
+## Multiplataforma
 
-`prototipo/organitza_estudis.py` es la primera versión, un script suelto con
-`argparse` que clasificaba PDFs por la materia y leía su `.md` asociado. La idea
-siguió viva, pero el esquema de este proyecto es mejor: ahora la clasificación por
-asignatura es **una acción declarativa** en `acciones.json`, y el motor hace el
-resto. Se queda en el repo como prueba de por dónde empezó la herramienta.
+- `pathlib.Path` siempre, `expanduser()` para las rutas con `~`, y
+  `encoding="utf-8"` en todas las lecturas y escrituras.
+- Los nombres se comparan **normalizados a NFC**: un fichero guardado en NFD
+  (como los de macOS) y el nombre tecleado en NFC se ven iguales pero no lo
+  son, y sin normalizar la herramienta no los encontraría.
+- Los nombres que genera `renombrar` se validan contra las reglas de Windows,
+  que son las más estrictas.
+- Los `.odt` y los `.docx` se escriben con la biblioteca estándar.
 
 ## Seguridad
 
 - `.env` está en `.gitignore` desde el primer commit. Ninguna clave en el repo.
-- Las acciones destructivas (`borrar`) piden confirmación salvo `--si`.
-- `--simular` no toca el disco: ni mueve, ni copia, ni crea carpetas. Y la
-  simulación enseña **exactamente** el mismo destino que la ejecución real,
-  incluidos los sufijos « (1)» cuando dos ficheros acabarían con el mismo nombre.
-- Nunca se sobrescribe un fichero: si el destino existe, se añade ` (1)`, ` (2)`…
-  Ni siquiera a través de un enlace simbólico roto.
-- Un fichero que falla no corta la acción: se anota el error, se sigue con los
-  demás y el programa sale con código 1.
+- Las acciones que borran piden confirmación salvo `--si`.
+- `tareas ejecutar` admite `--simular`, que enseña qué haría sin tocar nada.
 - Prueba siempre en `~/pruebas-tareas`, nunca sobre tus carpetas reales.
   Con `--config pruebas/acciones-prueba.json` todas las rutas apuntan ahí.
-
-## Multiplataforma
-
-Reglas que sigue el código, para que funcione igual en Linux, Windows y macOS:
-
-- `pathlib.Path` siempre, nunca rutas montadas a mano con `/` o `\`.
-- `expanduser()` para las rutas con `~`.
-- `encoding="utf-8-sig"` al leer `acciones.json`: acepta los ficheros con BOM
-  que guarda el Bloc de notas de Windows.
-- `shutil.move` y `shutil.copy2`, nada de `os.system`, `subprocess` ni `shell=True`.
-- Colores con Rich, no con códigos ANSI a mano.
-- Los nombres que genera `renombrar` se validan contra las reglas de Windows
-  (que son las más estrictas): sin `\/:*?"<>|` y sin nombres reservados como
-  `CON` o `NUL`.
-
