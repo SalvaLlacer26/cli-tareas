@@ -21,6 +21,20 @@ Para instalarla desde el repo, sin clonarlo:
 uv tool install git+https://github.com/SalvaLlacer26/cli-tareas
 ```
 
+### Configuración de usuario
+
+Por defecto, `acciones.json` se busca en la carpeta desde la que lanzas la
+orden. Si quieres usarlo desde cualquier sitio, pon una copia en tu carpeta de
+configuración:
+
+```bash
+mkdir -p ~/.config/tareas
+cp acciones.json ~/.config/tareas/acciones.json
+```
+
+A partir de ahí, `tareas organizar` funciona desde cualquier carpeta. (En
+Windows la ruta es `%APPDATA%\tareas\`.)
+
 Para desarrollar (recarga los cambios al instante):
 
 ```bash
@@ -147,6 +161,7 @@ lo heredan.
 | Campo | Tipo | Qué hace |
 |---|---|---|
 | `descargas` | ruta | De dónde saca los ficheros `tareas organizar`. Admite `~`. |
+| `documentos` | lista | Qué extensiones se consideran material de estudio. Lo que no sea un documento (un `.tar.xz`, un `.deb`, una foto) va a la carpeta de respaldo aunque su nombre coincida con el de una asignatura. |
 
 ### Cada acción
 
