@@ -6,6 +6,29 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v1.2.0] — 2026-11-02
+
+Pequeños arreglos y comodidades después de probar la herramienta con los
+ficheros de verdad de la carpeta de descargas.
+
+### Añadido
+
+- **Configuración de usuario**: si no hay un `acciones.json` en la carpeta
+  desde la que se lanza la orden, se busca en `~/.config/tareas/acciones.json`
+  (o `%APPDATA%\tareas\` en Windows). La herramienta se puede usar desde
+  cualquier sitio sin pasar `--config` cada vez.
+- **Regla de qué es material de estudio** (`organizador.documentos`): un
+  `.tar.xz` con «linux» en el nombre o una foto de una biblioteca ya no acaban
+  en la carpeta de Sistemas o de Bases de Datos; van a la de respaldo.
+- **5 pruebas nuevas** (68 en total) sobre la regla de documentos y las
+  extensiones compuestas.
+
+### Corregido
+
+- `normalizar` mangaba las extensiones compuestas: `archivo.tar.xz` se
+  convertía en `archivo-tar.xz` y dejaba de acabar en `.tar.xz`, con lo cual
+  la acción `separar-comprimidos` ya no lo encontraba.
+
 ## [v1.1.0] — 2026-10-27
 
 Ahora la herramienta **organiza la carpeta de descargas entera con una orden**
@@ -38,11 +61,21 @@ propia herramienta entiende.
   pierda ni un nombre.
 - **16 pruebas nuevas** (63 en total) sobre la normalización de nombres, la
   clasificación, el ciclo completo de ida y vuelta y el manifiesto.
+- **Configuración de usuario**: si no hay un `acciones.json` en la carpeta
+  desde la que se lanza la orden, se busca en `~/.config/tareas/acciones.json`
+  (o `%APPDATA%\tareas\` en Windows). La herramienta se puede usar desde
+  cualquier sitio sin pasar `--config` cada vez.
+- **Regla de qué es material de estudio** (`organizador.documentos`): un
+  `.tar.xz` con «linux» en el nombre o una foto de una biblioteca ya no acaban
+  en la carpeta de Sistemas o de Bases de Datos; van a la de respaldo.
 
 ### Corregido
 
 - `normalizar` duplicaba la clave cuando el nombre ya la tenía delante
   (`bbdd_bbdd-nota.pdf`). Ahora normalizar dos veces no cambia nada.
+- `normalizar` mangaba las extensiones compuestas: `archivo.tar.xz` se
+  convertía en `archivo-tar.xz` y dejaba de acabar en `.tar.xz`, con lo cual
+  la acción `separar-comprimidos` ya no lo encontraba.
 
 ## [v1.0.0] — 2026-10-27
 
