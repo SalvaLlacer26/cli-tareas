@@ -6,6 +6,48 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.2.0] — 2026-11-02
+
+La IA ya no solo resume: **busca en internet** para completar los documentos
+que llegan esquemáticos, y decide **qué tipo de ejercicios** pide cada tema.
+Y hay un comando nuevo que crea las carpetas según el contenido.
+
+### Añadido
+
+- **Búsqueda en internet** (`busqueda.py`): Wikipedia (API abierta, sin clave)
+  y el «Instant Answer» de DuckDuckGo. Si no hay red, devuelve una lista
+  vacía y no rompe nada.
+- **Protocolo de búsqueda**: el modelo escribe `[[BUSCAR: consulta]]` cuando
+  necesita información que no tiene, la herramienta se la busca y se la
+  devuelve. Así **decide el modelo** si el documento es demasiado escueto, que
+  es lo que tiene que pasar.
+- **`resumir` completa los documentos escuetos**: si el modelo lo pide, el
+  resumen se amplía con lo que encuentre en internet. **Las fuentes se
+  escriben al final del documento, con su URL.**
+- **`evaluar` entiende de qué va el documento**: el modelo decide la mezcla de
+  tipo test, desarrollo y cálculo según el tema, **explica al principio qué ha
+  decidido y por qué**, y omite los apartados que no tengan sentido (un tema
+  puramente teórico no lleva ejercicios de cálculo).
+- **`evaluar` usa el resumen como contexto**: si ya se hizo `tareas resumir`
+  de ese documento, ese resumen (que puede llevar información de internet) se
+  le pasa al modelo para preparar las preguntas.
+- **Comando `tareas clasificar [CARPETA] --destino RUTA`**: crea en la ruta
+  indicada un grupo de carpetas **decidido por la IA según el contenido de los
+  documentos**, y mueve cada documento dentro respetando su nombre original.
+  Un PDF de recetas acaba en una carpeta «Recetas» y un manual de hardware en
+  otra «Hardware». Las fichas viajan con cada documento.
+- **25 pruebas nuevas** (134 en total): la búsqueda, el protocolo, el bucle de
+  IA con búsqueda y la agrupación de documentos.
+
+### Corregido
+
+- **Los PDF se leen mejor.** Antes se leían 3 páginas: un PDF de diapositivas
+  de 17 páginas se quedaba con 431 caracteres y era inútil. Ahora se leen más
+  páginas hasta llegar a 8 000 caracteres (con un tope de 40), y ese mismo
+  documento da 4 985.
+- El símbolo `→` (U+2192) de la salida de «clasificar» tampoco cabía en la
+  consola de Windows. Lo detectó la prueba de multiplataforma.
+
 ## [v2.1.0] — 2026-11-02
 
 Las órdenes `resumir` y `evaluar` ya no son un andamiaje: las escribe un
