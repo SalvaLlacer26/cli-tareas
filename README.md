@@ -46,7 +46,8 @@ cp acciones.json ~/.config/tareas/acciones.json
 | `tareas organizar [CARPETA]` | Mueve cada documento a la carpeta de su asignatura usando las fichas, y le devuelve el nombre original. Muestra un resumen. |
 | `tareas deshacer [CARPETA]` | Deshace lo anterior: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
 | `tareas resumir 'ARCHIVO' [CARPETA]` | Crea un resumen del archivo (10 páginas como máximo, sin imágenes, organizado en apartados) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. |
-| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea una batería de ejercicios (tipo test, desarrollo y cálculo) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. |
+| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea una batería de ejercicios en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. La IA decide la mezcla de tipos según el tema. |
+| `tareas clasificar [CARPETA] --destino RUTA` | Crea en `RUTA` un grupo de carpetas **decidido por la IA** según el contenido de los documentos, y mueve cada documento dentro. |
 | `tareas comandos` | Lista todos los comandos, cómo se usan y para qué sirven. |
 | `tareas validar` | Comprueba el fichero de configuración y dice qué campo falla. |
 | `tareas ejecutar NOMBRE [CARPETA]` | Ejecuta una de las acciones del fichero de configuración. |
@@ -160,6 +161,34 @@ TAREAS_IA_CA=~/.config/opencode/ca-simarro.crt
 
 El fichero `.env` se busca en la carpeta desde la que se lanza la orden y en
 `~/.config/tareas/.env`. Las variables de entorno del sistema tienen prioridad.
+
+#### Documentos escuetos: la IA busca en internet
+
+Un PDF de diapositivas puede tener 17 páginas y solo 400 caracteres de texto.
+En ese caso, un resumen del documento no sirve de nada: hay que **completar la
+información**.
+
+Para eso, el modelo decide por su cuenta si necesita más datos. Si los
+necesita, escribe una línea con la forma `[[BUSCAR: consulta]]` y la
+herramienta busca esa información en internet (Wikipedia y DuckDuckGo, sin
+claves ni servicios de pago), se la devuelve al modelo y este termina el
+resumen. **Las fuentes consultadas se escriben al final del documento**, con su
+URL.
+
+El mismo mecanismo se usa en `evaluar`: si el modelo necesita una definición
+que no está en el documento, la busca.
+
+#### `evaluar` entiende de qué va el documento
+
+No todos los temas admiten el mismo tipo de ejercicio. Un tema de teoría
+(definiciones, conceptos, terminología) **no** lleva ejercicios de cálculo; uno
+de conversiones numéricas, sí. El modelo decide la mezcla y **explica al
+principio del documento qué ha decidido y por qué**, y omite los apartados que
+no tengan sentido.
+
+Además, si ya hiciste `tareas resumir` de ese documento, ese resumen (que
+puede llevar información completada con internet) se usa como contexto para
+preguntar: el resultado es mucho mejor.
 
 #### Sin red o sin clave
 
@@ -280,7 +309,9 @@ cli-tareas/
 │   ├── organizador.py      # organizar y deshacer
 │   ├── documentos.py       # escribir .odt, .docx, .rtf y .txt
 │   ├── ia.py               # la capa de IA: cliente del servidor de modelos
+│   ├── busqueda.py         # buscar en internet (Wikipedia, DuckDuckGo)
 │   ├── markdown.py         # de la respuesta en Markdown a las secciones
+│   ├── agrupador.py        # el comando «clasificar»: carpetas decididas por la IA
 │   ├── resumen.py          # el resumen
 │   ├── evaluacion.py       # los ejercicios
 │   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)

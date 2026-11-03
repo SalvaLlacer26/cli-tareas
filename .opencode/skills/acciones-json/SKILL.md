@@ -46,6 +46,8 @@ Raíz: `{"version": 1, "acciones": [...], "carpetas": [...]}`.
 
 - `ia.py` es el **único** módulo que habla con el servidor de modelos. Ningún
   otro abre una conexión.
+- `busqueda.py` es el **único** módulo que abre una conexión a internet
+  (Wikipedia y DuckDuckGo, sin claves).
 - La configuración sale de `TAREAS_IA_URL`, `TAREAS_IA_KEY`, `TAREAS_MODELO`,
   `TAREAS_IA_CA` y `TAREAS_IA_TIMEOUT`, o de un `.env`. **La clave nunca se
   escribe en el repo**: el `.env` está en el `.gitignore` desde el primer
@@ -55,11 +57,40 @@ Raíz: `{"version": 1, "acciones": [...], "carpetas": [...]}`.
   puede reventar con una traza** por un problema de red.
 - **Las pruebas no salen a la red.** El fixture automático de
   `tests/conftest.py` aparta la configuración de la IA; la llamada al
-  servidor se simula en `tests/test_ia.py`. Las pruebas que sí necesitan el
-  modelo de verdad van marcadas con `@pytest.mark.ia` y solo se ejecutan con
-  `uv run pytest -m ia`.
-- El modelo devuelve Markdown; `markdown.py` lo traduce a las secciones del
-  documento. Si cambias el formato de la respuesta, cambia también ese módulo.
+  servidor se simula en `tests/test_ia.py` y `tests/test_ia_busqueda.py`. Las
+  pruebas que sí necesitan el modelo de verdad van marcadas con
+  `@pytest.mark.ia` y solo se ejecutan con `uv run pytest -m ia`.
+
+### El protocolo de búsqueda
+
+El modelo **no** tiene herramienta de búsqueda. Cuando necesita información que
+no tiene, escribe una línea con esta forma y termina su turno:
+
+```
+[[BUSCAR: consulta]]
+```
+
+`ia.pedir_con_busqueda()` la busca, le pasa los resultados y le vuelve a
+preguntar. **Quien decide si hace falta buscar es el modelo**, no el código: si
+el documento está bien, no busca nada.
+
+Si añades un paso nuevo que necesite internet, usa `pedir_con_busqueda()` y no
+montes tu propio bucle. Y devuelve las fuentes: se escriben al final del
+documento.
+
+### Lo que devuelve el modelo
+
+Markdown. `markdown.py` lo traduce a las secciones del documento: encabezados
+de dos niveles, viñetas, tablas con tabuladores y negritas de verdad en el
+`.odt` y el `.docx`.
+
+### El comando `clasificar`
+
+`agrupador.py` agrupa documentos en carpetas **decididas por la IA**, no por
+`acciones.json`. El modelo responde con un formato muy simple (`[Carpeta]`
+seguido de `- documento`) que la herramienta lee y sanea. Si añades un tipo de
+agrupación, respeta ese formato: es lo que hace que funcione con cualquier
+modelo.
 
 ## Trampas conocidas
 

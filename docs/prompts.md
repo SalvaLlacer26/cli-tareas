@@ -568,3 +568,90 @@ necesitan el modelo simulan la llamada a `urlopen`.
 
 
 
+
+
+---
+
+## 2026-11-02 · La IA busca en internet y decide los ejercicios
+
+**Petición:** «que el comando resumen utilice la IA no solo para resumir, sino
+para que, en caso de que la documentación de entrada tenga contenido escaso o
+demasiado resumido, la IA busque en internet y complete de forma resumida todos
+los contenidos». Y: «el comando evaluar no ha funcionado sobre ese PDF; la IA
+debe entender el contexto y usar el contenido del documento + el resumen
+completado». Y un comando nuevo, `tareas clasificar`.
+
+**Primero, mirar el documento queFallaba.** `Ud1-Introduccion-a-las-Bases-de-Datos.pdf`:
+17 páginas y **431 caracteres** de texto. Era un PDF de diapositivas.
+
+**Causa raíz, y no era la que yo pensaba.** Yo使用的是 `pdftotext` con las
+**tres primeras páginas**, y por eso solo salía el índice y un título. El
+documento entero tenía **5 204 caracteres**: la información estaba, pero en
+las páginas 4 a 17. Arreglé `contenido.py` para que lea más páginas hasta
+llegar a 8 000 caracteres (con un tope de 40 páginas). El mismo documento pasó
+de 431 a 4 985 caracteres.
+
+**Cómo se hace que la IA busque en internet.** Un modelo de la API del centro
+no tiene herramienta de búsqueda, y aunque la tuviera no podría llamarse a sí
+mismo. Así que se inventó un **protocolo**:
+
+```
+[[BUSCAR: consulta]]
+```
+
+El modelo escribe esa línea y termina su turno. La herramienta la busca, le
+pasa los resultados y le vuelve a preguntar. Lo importante es **quién decide**:
+no soy yo, es el modelo, según si ve que le falta información. Un modelo que
+no necesita nada no busca nada, y uno que tiene un documento escueto busca por
+concepto.
+
+La búsqueda usa la **API de Wikipedia** (abierta, sin clave, con el texto
+plano del artículo y su URL) y el Instant Answer de DuckDuckGo. Wikipedia
+devolvió 28 000 caracteres de «Base de datos»: de sobra para completar unas
+diapositivas.
+
+**Lo que hizo el modelo con el PDF de prueba** (esto es lo que se le pidió):
+
+- Detectó que el documento era demasiado escueto, pidió una búsqueda y
+  completó el resumen con la información de Wikipedia, incluyendo una **tabla**
+  comparando fichero y base de datos. Al final del documento se escriben las
+  fuentes con su URL.
+- En los ejercicios, entendió que el tema era **puramente teórico** y escribió:
+  «Este documento es puramente teórico (definiciones, conceptos, fases de
+  diseño y terminología), por lo que no admite ejercicios de cálculo
+  numérico. Se ha omitido el apartado «Cálculo y problemas» por carecer de
+  fórmulas o datos cuantitativos.» Eso es exactamente lo que pedía el
+  enunciado: que la IA entienda de qué va el documento.
+- Y como antes se había hecho el resumen, ese resumen (con la información de
+  internet) se usó como contexto: las preguntas salen sobre el contenido real
+  del tema, no solo sobre las 400 palabras del original.
+
+**El comando `clasificar`.** Aquí las carpetas **no** están escritas en
+`acciones.json`: las decide la IA mirando el contenido. El modelo responde con
+un formato muy simple (`[Carpeta]` seguido de `- documento`), que la
+herramienta lee, sanea (para que el nombre se pueda crear en Windows) y usa
+para mover los documentos. Probado con cuatro ficheros:
+
+```
+Recetas   -> Bizcocho de limon.txt, Tortilla de patatas.txt
+Historia  -> Historia de Roma.txt
+Hardware  -> Manual de la placa base Gigabyte.txt
+```
+
+**Lo que aprendí:**
+
+- **Un fallo que parecía de la IA era de mi lectura.** Antes de culpar al
+  modelo por «no entender» el documento, comprobé cuántos caracteres tenía de
+  verdad. La mitad del problema era que yo le daba 431 caracteres de un
+  documento de 5 204. Antes de pedirle más inteligencia al modelo, hay que
+  darle bien los datos.
+- **Un protocolo en texto plano es más robusto que depender de que el modelo
+  soporte «function calling».** No todos los servidores lo implementan, y
+  este no. Con una marca `[[BUSCAR: ...]]` funciona en cualquier API
+  compatible con OpenAI.
+- **Quien debe decidir si un documento está completo es el modelo, no el
+  código.** Si el código decide, hay que codificar cuándo «es poco texto», y
+  eso siempre se queda corto o se pasa. El modelo lo sabe mirando lo que tiene.
+- **La IA también se equivoca, y hay que decirlo.** El revisor es el que
+  avisa de los casos raros (un fichero ya renombrado, una ficha que no
+  aparece). Eso va en el prompt de `deshacer`, no en el código de `deshacer`.
