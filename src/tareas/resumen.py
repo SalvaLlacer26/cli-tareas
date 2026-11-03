@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .busqueda import Fuente
 from .documentos import Seccion, escribir_documento
 from .errores import DocumentoNoEncontrado, ErrorIA
 from .ficha import Ficha
@@ -133,9 +134,13 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
     return secciones
 
 
-def pedir_resumen(ficha: Ficha) -> list[Seccion]:
-    """Le pide al modelo un resumen y lo convierte en secciones."""
-    from .ia import pedir
+def pedir_resumen(ficha: Ficha) -> tuple[list[Seccion], list[Fuente]]:
+    """Le pide al modelo un resumen y lo convierte en secciones.
+
+    Si el documento es demasiado escueto, el modelo pide una búsqueda con
+    ``[[BUSCAR: consulta]]`` y la herramienta se la devuelve ya hecha.
+    """
+    from .ia import pedir_con_busqueda
 
     contenido = ficha.contenido.strip()[:MAXIMO_CARACTERES]
     if not contenido:
@@ -152,27 +157,41 @@ def pedir_resumen(ficha: Ficha) -> list[Seccion]:
         f"- Usa encabezados de segundo nivel (##) para los apartados.\n"
         f"- No inventes nada: solo lo que esté en el texto.\n"
         f"- Escribe en el idioma del documento.\n\n"
+        f"Si el documento es demasiado escueto o está muy sintetizado (por ejemplo, "
+        f"solo tiene un índice y títulos, o es un PDF de diapositivas con muy poco "
+        f"texto), te falta información para hacer un buen resumen. En ese caso, "
+        f"escribe una línea con la forma [[BUSCAR: consulta]] y termina tu turno: "
+        f"se buscará esa información en internet y te la devolveré para que la uses. "
+        f"Pide una búsqueda por concepto, no por el documento entero.\n\n"
         f"--- DOCUMENTO ---\n{contenido}"
     )
 
-    respuesta = pedir(SISTEMA, peticion)
+    respuesta, fuentes = pedir_con_busqueda(SISTEMA, peticion)
     secciones = a_secciones(respuesta, titulo="Ideas principales")
     if not secciones or not any(s.lineas for s in secciones):
         raise ErrorIA("el modelo ha contestado pero sin contenido")
-    return secciones
+    return secciones, fuentes
 
 
-def construir_secciones(ficha: Ficha, con_ia: bool = True) -> tuple[list[Seccion], str]:
-    """Las secciones del resumen y una nota sobre cómo se han hecho."""
+def construir_secciones(ficha: Ficha, con_ia: bool = True) -> tuple[list[Seccion], str, list[Fuente]]:
+    """Las secciones del resumen, una nota y las fuentes usadas."""
     if con_ia:
         try:
-            return pedir_resumen(ficha), "Generado con inteligencia artificial."
+            secciones, fuentes = pedir_resumen(ficha)
+            nota = "Generado con inteligencia artificial."
+            if fuentes:
+                nota += (
+                    f" El documento era demasiado escueto, así que se ha completado "
+                    f"con información de {len(fuentes)} fuente(s) de internet."
+                )
+            return secciones, nota, fuentes
         except ErrorIA as exc:
             nota = f"Generado sin inteligencia artificial: {exc}"
-            return construir_secciones_extractivas(ficha), nota
+            return construir_secciones_extractivas(ficha), nota, []
     return (
         construir_secciones_extractivas(ficha),
         "Generado sin inteligencia artificial: no hay modelo configurado.",
+        [],
     )
 
 
@@ -180,12 +199,20 @@ def escribir_resumen(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
     """Escribe el fichero del resumen en la carpeta «resumenes»."""
     from .documentos import formato_preferido
 
-    secciones, nota = construir_secciones(ficha, con_ia=True)
+    secciones, nota, fuentes = construir_secciones(ficha, con_ia=True)
     titulo = f"Resumen · {ficha.nombre_original}"
-    secciones = [Seccion("", [nota], nivel=1), *secciones]
+    bloques = [Seccion("", [nota], nivel=1), *secciones]
+
+    if fuentes:
+        lineas = []
+        for fuente in fuentes:
+            lineas.append(f"• {fuente.titulo} — {fuente.url}")
+        bloques.append(Seccion("Fuentes consultadas", lineas))
+
     destino = carpeta / "resumenes"
     nombre = f"{_base(ficha.nombre_original)}_resumido{formato or formato_preferido()}"
-    return escribir_documento(destino / nombre, titulo, secciones)
+    return escribir_documento(destino / nombre, titulo, bloques)
+
 
 
 def _base(nombre: str) -> str:
