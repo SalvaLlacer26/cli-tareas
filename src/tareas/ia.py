@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import ssl
 import urllib.error
 import urllib.request
@@ -29,6 +30,7 @@ from pathlib import Path
 
 from platformdirs import user_config_dir
 
+from .busqueda import Fuente
 from .errores import ErrorIA, TareasError
 
 #: Variables de entorno que se leen.
@@ -253,3 +255,123 @@ def _extraer_texto(datos: dict) -> str:
             return "\n".join(partes).strip()
 
     raise ErrorIA("el servidor de modelos no ha devuelto ningún texto")
+
+
+#: Lo que escribe el modelo cuando quiere que se busque algo en internet.
+RE_BUSQUEDA = re.compile(r"\[\[\s*BUSCAR\s*:\s*(.+?)\s*\]\]", re.IGNORECASE)
+
+
+def buscar_en_la_respuesta(respuesta: str) -> list[str]:
+    """Las consultas que el modelo pide buscar."""
+    consultas = []
+    for encontrada in RE_BUSQUEDA.findall(respuesta):
+        consulta = encontrada.strip().strip('"').strip("'")
+        if consulta and consulta not in consultas:
+            consultas.append(consulta)
+    return consultas
+
+
+def pedir_con_busqueda(
+    sistema: str,
+    usuario: str,
+    maximo_consultas: int = 3,
+) -> tuple[str, list[Fuente]]:
+    """Le pide una respuesta al modelo y, si lo pide, busca en internet.
+
+    El modelo tiene un protocolo: si necesita información que no está en lo
+    que le han dado, escribe una línea con la forma::
+
+        [[BUSCAR: consulta]]
+
+    y termina su turno. Entonces se busca la consulta, se le pasan los
+    resultados y se le vuelve a preguntar. Así el modelo decide **él
+    mismo** si el documento es demasiado escueto y hay que completarlo.
+
+    Devuelve la respuesta final y las fuentes que se han usado.
+    """
+    from .busqueda import buscar, como_texto
+
+    mensajes: list[dict[str, str]] = [
+        {"role": "system", "content": sistema},
+        {"role": "user", "content": usuario},
+    ]
+    fuentes: list[Fuente] = []
+    vistas: set[str] = set()
+
+    for _ in range(maximo_consultas + 1):
+        respuesta = pedir_con_historial(sistema, mensajes)
+        consultas = buscar_en_la_respuesta(respuesta)
+
+        if not consultas:
+            return respuesta, fuentes
+
+        for consulta in consultas:
+            for fuente in buscar(consulta):
+                if fuente.url in vistas:
+                    continue
+                vistas.add(fuente.url)
+                fuentes.append(fuente)
+
+        if not fuentes:
+            # Se ha intentado buscar y no ha salido nada: se sigue con lo que
+            # hay, para no quedarse esperando.
+            return respuesta, fuentes
+
+        mensajes.append({"role": "assistant", "content": respuesta})
+        mensajes.append(
+            {
+                "role": "user",
+                "content": (
+                    "RESULTADOS DE LA BÚSQUEDA EN INTERNET:\n\n"
+                    f"{como_texto(fuentes)}\n\n"
+                    "Continúa con la tarea usando esta información. No la repitas "
+                    "entera: úsala para completar lo que faltaba. Si te falta algo "
+                    "más, pídelo otra vez con [[BUSCAR: consulta]]; si ya tienes "
+                    "suficiente, escribe la respuesta final."
+                ),
+            }
+        )
+
+    return respuesta, fuentes
+
+
+def pedir_con_historial(sistema: str, mensajes: list[dict[str, str]]) -> str:
+    """Pide una respuesta teniendo en cuenta el historial de la conversación."""
+    config = configuracion()
+    if not config.url or not config.clave:
+        raise ErrorIA(f"no se puede usar el modelo: {motivo_de_no_disponible()}")
+
+    cuerpo = {
+        "model": config.modelo,
+        "messages": mensajes,
+        "max_tokens": TOKENS_MAXIMOS,
+        "temperature": 0.3,
+    }
+
+    peticion = urllib.request.Request(
+        _endpoint(config, "chat/completions"),
+        data=json.dumps(cuerpo).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {config.clave}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(
+            peticion, timeout=config.tiempo, context=_contexto_ssl(config)
+        ) as respuesta:
+            datos = json.loads(respuesta.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise ErrorIA(f"el servidor de modelos respondió con un error ({exc.code})") from exc
+    except urllib.error.URLError as exc:
+        raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise ErrorIA("el servidor de modelos no ha contestado a tiempo") from exc
+    except OSError as exc:
+        raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ErrorIA("el servidor de modelos ha contestado algo que no es JSON") from exc
+
+    return _extraer_texto(datos)

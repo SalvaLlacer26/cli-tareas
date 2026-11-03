@@ -37,8 +37,15 @@ FORMATOS_CON_TEXTO = {
     ".json": "txt",
 }
 
-#: Cuántas páginas se leen de un PDF. Suficiente para saber de qué va.
-PAGINAS_PDF = 3
+#: Cuántas páginas se leen de un PDF como mínimo. Un PDF de apuntes suele
+#: tener la información repartida, y con tres páginas no se ve casi nada.
+PAGINAS_PDF = 6
+
+#: Hasta cuántas páginas se llega si el documento sigue.teniendo poco texto.
+PAGINAS_MAXIMAS_PDF = 40
+
+#: Cuántos caracteres se quieren como mínimo. Si se llega antes, se para.
+CARACTERES_OBJETIVO = 8000
 
 #: Cuántos caracteres se guardan del contenido extraído.
 MAXIMO_CARACTERES = 40000
@@ -124,7 +131,13 @@ def extraer(ruta: Path) -> Contenido:
 
 
 def _de_pdf(ruta: Path) -> Contenido:
-    """Lee las primeras páginas de un PDF con pdftotext."""
+    """Lee el PDF de un PDF, ampliando páginas si el texto es escaso.
+
+    Los PDF de diapositivas tienen el contenido repartido: con las tres
+    primeras páginas puede quedar solo el índice y un título. Por eso se leen
+    más páginas de las necesarias y, si el texto sigue siendo corto, se sigue
+    hasta el tope. Nunca se lee el PDF entero: el tope está puesto.
+    """
     if not shutil.which("pdftotext"):
         return Contenido(
             formato=".pdf",
@@ -132,15 +145,14 @@ def _de_pdf(ruta: Path) -> Contenido:
             motivo="falta la herramienta «pdftotext» (paquete poppler-utils)",
         )
 
-    resultado = subprocess.run(
-        ["pdftotext", "-f", "1", "-l", str(PAGINAS_PDF), str(ruta), "-"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=60,
-        check=False,
-    )
-    texto = resultado.stdout.decode("utf-8", errors="ignore")
     paginas = _paginas_pdf(ruta)
+    total = paginas or PAGINAS_PDF
+    leidas = min(PAGINAS_PDF, total)
+
+    texto = _paginas_de_texto(ruta, leidas)
+    while len(texto.strip()) < CARACTERES_OBJETIVO and leidas < min(PAGINAS_MAXIMAS_PDF, total):
+        leidas = min(leidas * 2, PAGINAS_MAXIMAS_PDF, total)
+        texto = _paginas_de_texto(ruta, leidas)
 
     if not texto.strip():
         return Contenido(
@@ -152,6 +164,18 @@ def _de_pdf(ruta: Path) -> Contenido:
         )
 
     return Contenido(texto=texto[:MAXIMO_CARACTERES], formato=".pdf", paginas=paginas)
+
+
+def _paginas_de_texto(ruta: Path, hasta: int) -> str:
+    """El texto de las primeras «hasta» páginas."""
+    resultado = subprocess.run(
+        ["pdftotext", "-f", "1", "-l", str(hasta), str(ruta), "-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=120,
+        check=False,
+    )
+    return resultado.stdout.decode("utf-8", errors="ignore")
 
 
 def _paginas_pdf(ruta: Path) -> int | None:

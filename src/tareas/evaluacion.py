@@ -178,9 +178,31 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
     return secciones
 
 
-def pedir_ejercicios(ficha: Ficha) -> list[Seccion]:
+def resumen_previo(carpeta: Path, nombre: str) -> str:
+    """El resumen que ya se hizo de este documento, si lo hay.
+
+    Si se ha ejecutado «tareas resumir» antes, ese resumen (que puede llevar
+    información completada con internet) es el mejor contexto para preparar
+    los ejercicios: está más developed que el documento original.
+    """
+    from .contenido import extraer
+    from .nombres import separar_extension
+
+    base = separar_extension(nombre)[0]
+    carpeta_resumenes = Path(carpeta) / "resumenes"
+    if not carpeta_resumenes.is_dir():
+        return ""
+
+    for ruta in sorted(carpeta_resumenes.glob(f"{base}_resumido.*")):
+        contenido = extraer(ruta)
+        if contenido.analizable and contenido.texto.strip():
+            return contenido.texto[:12000]
+    return ""
+
+
+def pedir_ejercicios(ficha: Ficha, contexto_extra: str = "") -> tuple[list[Seccion], list[Fuente]]:
     """Le pide al modelo una batería de ejercicios y la convierte en secciones."""
-    from .ia import pedir
+    from .ia import pedir_con_busqueda
 
     contenido = ficha.contenido.strip()[:12000]
     if not contenido:
@@ -188,41 +210,76 @@ def pedir_ejercicios(ficha: Ficha) -> list[Seccion]:
 
     peticion = (
         f"Prepara una batería de ejercicios sobre este documento de apuntes.\n\n"
+        f"Primero entiende de qué va el documento: no todos los temas admiten el "
+        f"mismo tipo de ejercicio. Un tema de teoría (definiciones, conceptos, "
+        f"historia, terminología) NO debe llevar ejercicios de cálculo; un tema de "
+        f"cálculos (fórmulas, conversiones, números) sí, y quizá solo de eso. "
+        f"Decide la mezcla según el contenido y dilo en una línea al principio, "
+        f"con el motivo.\n\n"
         f"Reglas:\n"
-        f"- Tres apartados, con encabezados de segundo nivel (##): "
-        f"«Tipo test», «Preguntas de desarrollo» y «Cálculo y problemas».\n"
-        f"- En el tipo test, cada pregunta tiene CUATRO alternativas reales "
-        f"(no líneas de puntos), una sola correcta, y la respuesta correcta "
-        f"marcada al final de la pregunta entre corchetes, por ejemplo [b)].\n"
-        f"- Entre 5 y 8 preguntas de tipo test, entre 3 y 5 de desarrollo y "
-        f"entre 2 y 4 de cálculo, según lo que dé el documento.\n"
-        f"- Las preguntas de desarrollo y de cálculo llevan espacio para "
-        f"responder y el enunciado completo.\n"
-        f"- Al final, un apartado «## Soluciones» con la solución de cada "
-        f"pregunta de tipo test y con las pautas de las de desarrollo.\n"
+        f"- Apartados con encabezados de segundo nivel (##): «Tipo test», "
+        f"«Preguntas de desarrollo» y «Cálculo y problemas». Incluye solo los que "
+        f"tengan sentido para este documento y explica cuáles has dejado fuera.\n"
+        f"- En el tipo test, cada pregunta tiene CUATRO alternativas reales (no "
+        f"líneas de puntos), una sola correcta, y la respuesta correcta marcada al "
+        f"final de la pregunta entre corchetes, por ejemplo [b)].\n"
+        f"- Entre 5 y 8 preguntas de tipo test, entre 3 y 5 de desarrollo y entre "
+        f"2 y 4 de cálculo, según lo que dé el documento.\n"
+        f"- Las preguntas de desarrollo y de cálculo llevan espacio para responder "
+        f"y el enunciado completo.\n"
+        f"- Al final, un apartado «## Soluciones» con la solución de cada pregunta "
+        f"de tipo test y con las pautas de las de desarrollo.\n"
         f"- Solo contenido del documento. No inventes datos.\n"
-        f"- Escribe en el idioma del documento.\n\n"
+        f"- Escribe en el idioma del documento.\n"
+    )
+
+    if contexto_extra:
+        peticion += (
+            f"\nEste es un resumen más desarrollado del mismo documento (puede "
+            f"incluir información completada con internet). Úsalo como contexto "
+            f"para las preguntas, pero comprueba que sea coherente con el "
+            f"documento:\n\n"
+            f"--- RESUMEN DEL DOCUMENTO ---\n{contexto_extra}\n"
+        )
+
+    peticion += (
+        f"\nSi el documento es demasiado escueto o está muy sintetizado, o si te "
+        f"falta alguna definición para poder preguntar algo, escribe una línea con "
+        f"la forma [[BUSCAR: consulta]] y termina tu turno: se buscará esa "
+        f"información en internet y te la devolveré.\n\n"
         f"--- DOCUMENTO ---\n{contenido}"
     )
 
-    respuesta = pedir(SISTEMA, peticion)
+    respuesta, fuentes = pedir_con_busqueda(SISTEMA, peticion)
     secciones = a_secciones(respuesta, titulo="Ejercicios")
     if not secciones or not any(s.lineas for s in secciones):
         raise ErrorIA("el modelo ha contestado pero sin contenido")
-    return secciones
+    return secciones, fuentes
 
 
-def construir_secciones(ficha: Ficha, con_ia: bool = True) -> tuple[list[Seccion], str]:
-    """Las secciones de la batería y una nota sobre cómo se han hecho."""
+def construir_secciones(
+    ficha: Ficha, con_ia: bool = True, contexto_extra: str = ""
+) -> tuple[list[Seccion], str, list[Fuente]]:
+    """Las secciones de la batería, una nota y las fuentes usadas."""
     if con_ia:
         try:
-            return pedir_ejercicios(ficha), "Generado con inteligencia artificial."
+            secciones, fuentes = pedir_ejercicios(ficha, contexto_extra)
+            nota = "Generado con inteligencia artificial."
+            if contexto_extra:
+                nota += " Se ha usado el resumen ya hecho de este documento como contexto."
+            if fuentes:
+                nota += (
+                    f" El documento era demasiado escueto, así que se ha completado "
+                    f"con información de {len(fuentes)} fuente(s) de internet."
+                )
+            return secciones, nota, fuentes
         except ErrorIA as exc:
             nota = f"Generado sin inteligencia artificial: {exc}"
-            return construir_secciones_extractivas(ficha), nota
+            return construir_secciones_extractivas(ficha), nota, []
     return (
         construir_secciones_extractivas(ficha),
         "Generado sin inteligencia artificial: no hay modelo configurado.",
+        [],
     )
 
 
@@ -231,9 +288,15 @@ def escribir_evaluacion(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
     from .documentos import formato_preferido
     from .resumen import _base
 
-    secciones, nota = construir_secciones(ficha, con_ia=True)
+    contexto = resumen_previo(Path(carpeta), ficha.nombre_original)
+    secciones, nota, fuentes = construir_secciones(ficha, con_ia=True, contexto_extra=contexto)
     titulo = f"Ejercicios · {ficha.nombre_original}"
-    secciones = [Seccion("", [nota], nivel=1), *secciones]
+    bloques = [Seccion("", [nota], nivel=1), *secciones]
+
+    if fuentes:
+        lineas = [f"• {fuente.titulo} — {fuente.url}" for fuente in fuentes]
+        bloques.append(Seccion("Fuentes consultadas", lineas))
+
     destino = carpeta / "ejercicios"
     nombre = f"{_base(ficha.nombre_original)}_test{formato or formato_preferido()}"
-    return escribir_documento(destino / nombre, titulo, secciones)
+    return escribir_documento(destino / nombre, titulo, bloques)
