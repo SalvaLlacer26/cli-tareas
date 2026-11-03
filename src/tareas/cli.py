@@ -21,6 +21,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from tareas import __version__
+from tareas import agrupador
 from tareas.analizador import CARPETA_FICHAS, analizar
 from tareas.comandos import ANIO, AVISO_LEGAL, AUTOR, COMANDOS, CURSO
 from tareas.config import cargar
@@ -352,6 +353,57 @@ def _pintar_resultados(nombre: str, resultados: list, simular: bool) -> None:
     )
     if simular:
         consola.print("Para hacerlo de verdad, repite la orden sin --simular.")
+    if errores:
+        raise typer.Exit(code=1)
+
+
+@app.command(name="clasificar")
+def clasificar_cmd(
+    ctx: typer.Context,
+    destino: Annotated[
+        Path,
+        typer.Option("--destino", help="Ruta donde se crea el grupo de carpetas."),
+    ],
+    carpeta: Annotated[
+        Path | None,
+        typer.Argument(help="Carpeta con los documentos analizados (por defecto, la actual)."),
+    ] = None,
+) -> None:
+    """Crea las carpetas según el contenido de los documentos y los mueve dentro.
+
+    A diferencia de «organizar», que usa las asignaturas de la configuración,
+    aquí las carpetas las decide la IA mirando lo que dicen los documentos.
+    """
+    try:
+        cargar(ctx.obj)
+        origen = carpeta_de_trabajo(carpeta)
+        plan = agrupador.planear(origen, usar_ia=True)
+    except TareasError as exc:
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
+        raise typer.Exit(code=exc.codigo_salida) from exc
+
+    tabla = Table(title=f"Carpetas que se van a crear en {escape(str(destino.expanduser()))}")
+    tabla.add_column("Carpeta")
+    tabla.add_column("Documentos")
+    tabla.add_column("Cantidad", justify="right")
+    for grupo in plan.grupos:
+        tabla.add_row(escape(grupo.nombre), escape(", ".join(grupo.documentos[:3])), str(len(grupo.documentos)))
+    consola.print(tabla)
+
+    if not typer.confirm("¿Quieres crear esas carpetas y mover los documentos?"):
+        raise typer.Exit(code=1)
+
+    movidos, errores = agrupador.aplicar(origen, destino, plan)
+
+    consola.print(f"Total: {len(movidos)} documento(s) movido(s).")
+    for movimiento in movidos:
+        consola.print(f"  {escape(movimiento)}")
+    for error in errores:
+        consola_err.print(f"[yellow]{escape(error)}[/yellow]")
+
+    if plan.fuentes:
+        consola.print(f"[dim]Fuentes consultadas: {len(plan.fuentes)}[/dim]")
+
     if errores:
         raise typer.Exit(code=1)
 
