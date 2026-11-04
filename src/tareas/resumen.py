@@ -173,7 +173,45 @@ def pedir_resumen(ficha: Ficha) -> tuple[list[Seccion], list[Fuente]]:
     return secciones, fuentes
 
 
-def construir_secciones(ficha: Ficha, con_ia: bool = True) -> tuple[list[Seccion], str, list[Fuente]]:
+def consulta_del_documento(contenido: str) -> str:
+    """Una consulta de búsqueda sacada del propio documento.
+
+    Se usan las primeras palabras, que suelen ser el título. Si el título
+    lleva el nombre del autor o el nombre del curso, «buscar» los va
+    acortando hasta que algo encaja.
+    """
+    palabras = " ".join(contenido.split())[:200].split()
+    return " ".join(palabras[:12])
+
+
+def ampliacion_sin_modelo(ficha: Ficha) -> tuple[list[Seccion], list[Fuente]]:
+    """Busca en internet lo que trata el documento, aunque no haya modelo.
+
+    Si el servidor de modelos no está (o da error), al menos se pueden buscar
+    las fuentes y añadirlas al documento, marcadas como lo que son. Es mejor
+    que un resumen vacío, y deja claro que no lo ha hecho el modelo.
+    """
+    from .busqueda import buscar
+
+    consulta = consulta_del_documento(ficha.contenido)
+    if not consulta:
+        return [], []
+
+    fuentes = buscar(consulta, limite=2)
+    if not fuentes:
+        return [], []
+
+    secciones = []
+    for fuente in fuentes:
+        lineas = [f"Fuente: {fuente.url}", ""]
+        lineas.extend(fuente.fragmento.splitlines()[:40])
+        secciones.append(Seccion(fuente.titulo, lineas))
+    return secciones, fuentes
+
+
+def construir_secciones(
+    ficha: Ficha, con_ia: bool = True
+) -> tuple[list[Seccion], str, list[Fuente]]:
     """Las secciones del resumen, una nota y las fuentes usadas."""
     if con_ia:
         try:
@@ -186,8 +224,19 @@ def construir_secciones(ficha: Ficha, con_ia: bool = True) -> tuple[list[Seccion
                 )
             return secciones, nota, fuentes
         except ErrorIA as exc:
-            nota = f"Generado sin inteligencia artificial: {exc}"
-            return construir_secciones_extractivas(ficha), nota, []
+            nota = f"Generado sin inteligencia artificial: {exc}."
+            secciones = construir_secciones_extractivas(ficha)
+            try:
+                ampliacion, fuentes = ampliacion_sin_modelo(ficha)
+            except Exception:  # noqa: BLE001 - la ampliación es un extra
+                ampliacion, fuentes = [], []
+            if ampliacion:
+                nota += (
+                    " Aun así, se han buscado fuentes en internet sobre el tema "
+                    "del documento; están abajo sin resumir."
+                )
+                secciones = [*secciones, *ampliacion]
+            return secciones, nota, fuentes
     return (
         construir_secciones_extractivas(ficha),
         "Generado sin inteligencia artificial: no hay modelo configurado.",
