@@ -8,7 +8,7 @@ import urllib.error
 import pytest
 
 from tareas.errores import ErrorIA
-from tareas.ia import buscar_en_la_respuesta, pedir_con_busqueda
+from tareas.ia import buscar_en_la_respuesta, limpiar_marcadores, pedir_con_busqueda
 
 
 class RespuestaFalsa:
@@ -101,15 +101,19 @@ def test_con_peticion_de_busqueda_busca_y_vuelve_a_preguntar(monkeypatch, config
     assert "Ahora sí" in respuesta
 
 
-def test_si_la_busqueda_no_da_nada_no_se_insiste(monkeypatch, configuracion_ia) -> None:
-    """Sin resultados, no se queda esperando: sigue con lo que tenía."""
+def test_si_la_busqueda_no_da_nada_se_le_vuelve_a_preguntar(monkeypatch, configuracion_ia) -> None:
+    """Sin resultados, no se devuelve la petición de búsqueda: se le pregunta otra vez."""
     import urllib.request
 
+    respuestas = [
+        _respuesta("[[BUSCAR: nada]]"),
+        _respuesta("## Resumen\n\nCon lo que tenía, sin más."),
+    ]
     llamadas = []
 
     def falso(peticion, timeout=None, context=None):
-        llamadas.append(1)
-        return RespuestaFalsa(_respuesta("[[BUSCAR: nada]]"))
+        llamadas.append(json.loads(peticion.data.decode("utf-8")))
+        return RespuestaFalsa(respuestas[len(llamadas) - 1])
 
     monkeypatch.setattr(urllib.request, "urlopen", falso)
     monkeypatch.setattr("tareas.busqueda._wikipedia", lambda idioma, consulta, limite: [])
@@ -117,12 +121,18 @@ def test_si_la_busqueda_no_da_nada_no_se_insiste(monkeypatch, configuracion_ia) 
 
     respuesta, fuentes = pedir_con_busqueda("sistema", "usuario")
 
-    assert len(llamadas) == 1
+    assert len(llamadas) == 2
+    assert "[[BUSCAR" not in respuesta
+    assert "Con lo que tenía" in respuesta
     assert fuentes == []
 
 
 def test_el_numero_de_busquedas_es_limitado(monkeypatch, configuracion_ia) -> None:
-    """El modelo no puede pedir búsquedas sin fin."""
+    """El modelo no puede pedir búsquedas sin fin.
+
+    Cuando se agotan, se devuelve error para que la orden caiga al resumen
+    extractivo, en vez de escribir un documento lleno de marcas de búsqueda.
+    """
     import urllib.request
 
     llamadas = []
@@ -139,11 +149,94 @@ def test_el_numero_de_busquedas_es_limitado(monkeypatch, configuracion_ia) -> No
     monkeypatch.setattr("tareas.busqueda._wikipedia", lambda idioma, consulta, limite: [fuente])
     monkeypatch.setattr("tareas.busqueda._duckduckgo", lambda consulta: [])
 
-    pedir_con_busqueda("sistema", "usuario", maximo_consultas=2)
+    with pytest.raises(ErrorIA):
+        pedir_con_busqueda("sistema", "usuario", maximo_consultas=2)
 
     assert len(llamadas) == 3, "la llamada inicial más dos reintentos"
 
 
 def test_sin_clave_no_se_intenta_buscar() -> None:
+    with pytest.raises(ErrorIA):
+        pedir_con_busqueda("sistema", "usuario")
+
+
+# ------------------------------------------- la marca no debe colarse
+
+
+def test_la_marca_de_busqueda_se_quita_del_texto() -> None:
+    """Si la marca se colara, el usuario vería un [[BUSCAR: ...]] en el resumen."""
+    texto = "Ideas principales\n[[BUSCAR: bases de datos]]\nContenido de verdad."
+    limpio = limpiar_marcadores(texto)
+    assert "[[BUSCAR" not in limpio
+    assert "Ideas principales" in limpio
+    assert "Contenido de verdad." in limpio
+
+
+def test_una_linea_que_solo_es_la_marca_desaparece() -> None:
+    assert limpiar_marcadores("[[BUSCAR: solo esto]]") == ""
+
+
+def test_una_consulta_larga_se_acorta_hasta_que_encuentre_algo(monkeypatch) -> None:
+    """Wikipedia no encuentra nada con una consulta de 60 palabras: se acorta."""
+    import tareas.busqueda as busqueda
+
+    largas = []
+    cortas = []
+
+    def falso(idioma, consulta, limite):
+        if len(consulta.split()) > 5:
+            largas.append(consulta)
+            return []
+        cortas.append(consulta)
+        return [busqueda.Fuente("T", "https://x", "texto")]
+
+    monkeypatch.setattr(busqueda, "_wikipedia", falso)
+    monkeypatch.setattr(busqueda, "_duckduckgo", lambda consulta: [])
+
+    resultado = busqueda.buscar(
+        "Introducción a las bases de datos conceptos ficheros SGBD Alejandro Hernández Doménech"
+    )
+
+    assert resultado, "debe encontrar algo acortando la consulta"
+    assert cortas, "debe probar con una versión más corta"
+
+
+def test_si_no_hay_nada_que_buscar_se_le_pide_al_modelo_que_responda(monkeypatch, configuracion_ia) -> None:
+    """Si la búsqueda no da nada, no se devuelve su petición como respuesta."""
+    import urllib.request
+
+    respuestas = [
+        _respuesta("[[BUSCAR: nada de esto]]"),
+        _respuesta("## Resumen\n\nCon lo que tenía."),
+    ]
+    llamadas = []
+
+    def falso(peticion, timeout=None, context=None):
+        llamadas.append(json.loads(peticion.data.decode("utf-8")))
+        return RespuestaFalsa(respuestas[len(llamadas) - 1])
+
+    monkeypatch.setattr(urllib.request, "urlopen", falso)
+    monkeypatch.setattr("tareas.busqueda._wikipedia", lambda idioma, consulta, limite: [])
+    monkeypatch.setattr("tareas.busqueda._duckduckgo", lambda consulta: [])
+
+    respuesta, fuentes = pedir_con_busqueda("sistema", "usuario")
+
+    assert "[[BUSCAR" not in respuesta
+    assert "Con lo que tenía" in respuesta
+    assert len(llamadas) == 2, "se le vuelve a preguntar para que responda"
+
+
+def test_una_respuesta_que_solo_pide_buscar_da_error(monkeypatch, configuracion_ia) -> None:
+    """Si al final solo queda la petición de búsqueda, es un error: la CLI
+    tiene que caer al resumen extractivo en vez de escribir basura."""
+    import urllib.request
+
+    def falso(peticion, timeout=None, context=None):
+        return RespuestaFalsa(_respuesta("[[BUSCAR: nada]]"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", falso)
+    monkeypatch.setattr("tareas.busqueda._wikipedia", lambda idioma, consulta, limite: [])
+    monkeypatch.setattr("tareas.busqueda._duckduckgo", lambda consulta: [])
+
     with pytest.raises(ErrorIA):
         pedir_con_busqueda("sistema", "usuario")

@@ -196,3 +196,43 @@ def test_sin_clave_no_se_intenta_conectar() -> None:
     with pytest.raises(ErrorIA) as error:
         pedir("sistema", "usuario")
     assert "no se puede usar el modelo" in str(error.value)
+
+
+def test_un_error_momentaneo_se_reintenta(monkeypatch, configuracion_ia) -> None:
+    """Un 503 del servidor no puede acabar el intento: se reintenta."""
+    import urllib.error
+
+    import urllib.request
+
+    intentos = []
+
+    def falso(peticion, timeout=None, context=None):
+        intentos.append(1)
+        if len(intentos) < 3:
+            raise urllib.error.HTTPError("url", 503, "saturado", {}, io.BytesIO(b""))
+        return RespuestaFalsa({"choices": [{"message": {"content": "Ya funciona"}}]})
+
+    monkeypatch.setattr(urllib.request, "urlopen", falso)
+
+    assert pedir("sistema", "usuario") == "Ya funciona"
+    assert len(intentos) == 3, "dos reintentos antes de que funcione"
+
+
+def test_un_error_que_no_se_reintenta_falla_seguito(monkeypatch, configuracion_ia) -> None:
+    """Un 401 no se reintenta: la clave está mal y hay que decirlo."""
+    import urllib.error
+
+    import urllib.request
+
+    intentos = []
+
+    def falso(peticion, timeout=None, context=None):
+        intentos.append(1)
+        raise urllib.error.HTTPError("url", 401, "no autorizado", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr(urllib.request, "urlopen", falso)
+
+    with pytest.raises(ErrorIA) as error:
+        pedir("sistema", "usuario")
+    assert "401" in str(error.value)
+    assert len(intentos) == 1
