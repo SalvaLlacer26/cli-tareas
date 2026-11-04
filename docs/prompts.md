@@ -584,7 +584,7 @@ completado». Y un comando nuevo, `tareas clasificar`.
 **Primero, mirar el documento queFallaba.** `Ud1-Introduccion-a-las-Bases-de-Datos.pdf`:
 17 páginas y **431 caracteres** de texto. Era un PDF de diapositivas.
 
-**Causa raíz, y no era la que yo pensaba.** Yo使用的是 `pdftotext` con las
+**Causa raíz, y no era la que yo pensaba.** Yo usaba `pdftotext` con las
 **tres primeras páginas**, y por eso solo salía el índice y un título. El
 documento entero tenía **5 204 caracteres**: la información estaba, pero en
 las páginas 4 a 17. Arreglé `contenido.py` para que lea más páginas hasta
@@ -655,3 +655,91 @@ Hardware  -> Manual de la placa base Gigabyte.txt
 - **La IA también se equivoca, y hay que decirlo.** El revisor es el que
   avisa de los casos raros (un fichero ya renombrado, una ficha que no
   aparece). Eso va en el prompt de `deshacer`, no en el código de `deshacer`.
+
+
+---
+
+## 2026-11-04 · El resumen salía con una línea `[[BUSCAR: ...]]`
+
+**Aviso del alumno:** «El comando resumir solo ha hecho un documento con estas
+líneas de un pdf con bastante contenido: ... Ideas principales
+[[BUSCAR: Introducción a las bases de datos conceptos ficheros SGBD Alejandro
+Hernández Doménech]]. Es terrible, esta herramienta no funciona bien».
+
+**El documento generado era esto:**
+
+```
+Resumen · Ud1. Introducción a las Bases de Datos.pdf
+Generado con inteligencia artificial.
+Ideas principales
+[[BUSCAR: Introducción a las bases de datos conceptos ficheros SGBD Alejandro Hernández Doménech]
+```
+
+Es decir: **el modelo pidió una búsqueda, la búsqueda no dio nada, y su
+*petición de búsqueda* se convirtió en el resumen**. Peor: el documento
+decía «Generado con inteligencia artificial», así que parecía un resumen
+vacío y no un error.
+
+**Por qué la búsqueda no dio nada.** Probé la consulta tal cual:
+
+```
+consulta: 'Introducción a las bases de datos conceptos ficheros SGBD Alejandro Hernández Doménech'
+resultados: 0
+```
+
+Cuarenta palabras, y Wikipedia busca frases exactas: ninguna página tiene esa
+sucesión de palabras. Con la consulta corta («bases de datos») salían dos
+resultados. El modelo, además, metía el nombre del autor y el nombre del
+curso, que no ayudan de nada.
+
+**Y un segundo problema, peor.** Los apuntes empiezan por «Ud1.». Todas las
+variantes acortadas de la consulta seguían empezando por «Ud1.», así que
+ninguna funcionaba. Con el prefijo quitado, «Introducción a las Bases de
+Datos» sí encontraba.
+
+**Los arreglos:**
+
+1. **`limpiar_marcadores()`**: la marca se quita siempre de la respuesta. Es
+   la última línea de defensa: aunque todo lo demás falle, un documento no
+   puede llevar un `[[BUSCAR: ...]]`.
+2. **`consultas_alternativas()`**: la búsqueda prueba la consulta completa,
+   luego la versión sin el encabezado («Ud1.», «Tema 3»), y luego versiones
+   más cortas de esa. Se prueba la versión sin encabezado **antes** de
+   acortar, que es lo que fallaba.
+3. **Si la búsqueda no da nada, se le vuelve a preguntar al modelo** que
+   responda ya, en vez de devolver su petición como si fuera la respuesta.
+4. **Si al final solo queda la marca, es un error**: se lanza `ErrorIA` y la
+   orden cae al resumen extractivo, que al menos es el contenido del
+   documento. Un documento vacío con una nota es mejor que un documento con
+   una línea de código.
+5. **Ordenar las fuentes por relevancia** y descartar las que no comparten
+   ni una palabra con la consulta: al buscar «bases de datos» salía la
+   biografía de un señor con «datos» en el nombre.
+
+**Dos cosas más que aparecieron de paso:**
+
+- **El servidor del centro estaba caído** (`503 - No server is available`).
+  Un 503 no es un fallo de la herramienta, pero sí que la herramienta se
+  rindiera al primer error. Ahora los errores momentáneos se reintentan.
+- **Wikipedia con muchas peticiones seguidas devuelve 403.** Durante las
+  pruebas vi como una consulta idéntica devolvía dos resultados y al minuto
+  cero. Ahora las peticiones se reintentan, se espera entre ellas y se
+  cachean.
+
+**Un extra que salió de todo esto.** Si el modelo no está, ahora el documento
+igual incluye **las fuentes de internet sobre el tema**, marcadas como lo que
+son. Es peor que un resumen, pero es información de verdad y deja el
+documento medio útil.
+
+**Qué aprendí:**
+
+- **Un fallo que parece de la IA suele ser de la plumbing.** La IA pidió una
+  búsqueda razonable; la búsqueda no la encontró; y yo devolví la petición
+  como si fuera la respuesta. Tres capas, y el error estaba en la tercera.
+- **El parser tiene que ser defensivo con lo que devuelve el modelo.**
+  La marca `[[BUSCAR: ...]]` es un protocolo entre dos programas, y un
+  protocolo que puede fallar tiene que tener una salida: limpiar, y si no
+  queda nada, avisar.
+- **Probar con el caso real y no con el que te imaginas.** La prueba con un
+  PDF de diapositivas de 17 páginas y 431 caracteres destapó tres bugs que
+  con un fichero de texto normal no-salían.
