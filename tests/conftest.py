@@ -47,6 +47,29 @@ def _sin_red_real(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def _sin_esperas_reales(monkeypatch):
+    """Las esperas entre reintentos y peticiones no se esperan de verdad."""
+    import tareas.busqueda as busqueda
+    import tareas.ia as ia
+
+    monkeypatch.setattr(ia.time, "sleep", lambda segundos: None)
+    monkeypatch.setattr(busqueda.time, "sleep", lambda segundos: None)
+
+
+@pytest.fixture(autouse=True)
+def _sin_internet(monkeypatch):
+    """Ninguna prueba sale a internet.
+
+    `_pedir` es el único punto por el que `busqueda.py` abre una conexión.
+    Las pruebas que sí quieren probar la búsqueda sustituyen `_wikipedia` o
+    `_duckduckgo`, así que no se ven afectadas.
+    """
+    import tareas.busqueda as busqueda
+
+    monkeypatch.setattr(busqueda, "_pedir", lambda url: None)
+
+
 @pytest.fixture
 def configuracion_ia(monkeypatch):
     """Deja la IA «disponible» sin salir a la red: el modelo se simula."""

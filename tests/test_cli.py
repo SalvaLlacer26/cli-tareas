@@ -301,3 +301,50 @@ def test_evaluar_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -
     assert resultado.exit_code == 0
     documentos = list((tmp_path / "Descargas" / "ejercicios").iterdir())
     assert len(documentos) == 1
+
+
+# --------------------------------- el fallo que se reportó
+
+
+def test_el_resumen_nunca_lleva_una_marca_de_busqueda(tmp_path: Path, monkeypatch) -> None:
+    """Si el modelo solo pide buscar, el documento no puede llevar la marca.
+
+    Esto pasó de verdad: el modelo contestaba «[[BUSCAR: ...]]» y esa línea
+    se colaba en el resumen, dejando un documento inservible.
+    """
+    import tareas.resumen as resumen
+
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "Bases de datos y sus cosas")
+
+    monkeypatch.setattr(
+        resumen,
+        "pedir_resumen",
+        lambda ficha: (_ for _ in ()).throw(
+            __import__("tareas.errores", fromlist=["ErrorIA"]).ErrorIA(
+                "el modelo no ha dado una respuesta utilizable"
+            )
+        ),
+    )
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "resumir", "nota.txt", str(tmp_path / "Descargas")]
+    )
+
+    assert resultado.exit_code == 0
+    for documento_creado in (tmp_path / "Descargas" / "resumenes").iterdir():
+        texto = documento_creado.read_bytes().decode("utf-8", errors="ignore")
+        assert "[[BUSCAR" not in texto
+    assert "[[BUSCAR" not in resultado.output
+
+
+def test_la_marca_se_quita_aunque_el_modelo_sea_una_hoja() -> None:
+    """La limpieza de marcas es la última línea de defensa."""
+    from tareas.ia import limpiar_marcadores
+
+    assert "[[BUSCAR" not in limpiar_marcadores(
+        "Ideas principales\n[[BUSCAR: bases de datos]]\nContenido"
+    )
