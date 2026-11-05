@@ -318,14 +318,19 @@ def _ordenar(fuentes: list[Fuente], consulta: str) -> list[Fuente]:
     más útil que otro que solo la menciona de pasada. Sin esto, una búsqueda
     de «bases de datos» devuelve también biografías de gente con «datos» en el
     nombre.
+
+    Si dos títulos coinciden en lo mismo, gana el más corto: el artículo
+    general («Base de datos») explica mejor el tema que uno concreto
+    («Base de datos jerárquica»).
     """
     palabras = _palabras_significativas(consulta)
 
-    def puntuacion(fuente: Fuente) -> int:
+    def puntuacion(fuente: Fuente) -> tuple[int, int]:
         titulo = fuente.titulo.lower()
-        return sum(1 for palabra in palabras if _coincide(palabra, titulo))
+        coincidencias = sum(1 for palabra in palabras if _coincide(palabra, titulo))
+        return (-coincidencias, len(titulo))
 
-    return sorted(fuentes, key=lambda f: -puntuacion(f))
+    return sorted(fuentes, key=puntuacion)
 
 
 def _buscar_version(consulta: str, limite: int) -> list[Fuente]:
