@@ -70,6 +70,112 @@ def test_se_escribe_un_txt(tmp_path: Path) -> None:
     assert "Detalles" in texto
 
 
+# ------------------------------------------------- índice, numeración y página
+
+
+def _xml_de(tmp_path: Path, nombre: str, dentro: str) -> str:
+    ruta = escribir_documento(tmp_path / nombre, "Título", SECCIONES)
+    with zipfile.ZipFile(ruta) as paquete:
+        return paquete.read(dentro).decode("utf-8")
+
+
+def test_los_apartados_van_numerados_y_hay_indice(tmp_path: Path) -> None:
+    contenido = _xml_de(tmp_path, "salida.odt", "content.xml")
+    assert "Índice" in contenido
+    assert "1. Resumen" in contenido
+    assert "2. Detalles" in contenido
+    assert 'xlink:href="#seccion2"' in contenido
+
+
+def test_el_indice_no_sale_con_un_solo_apartado(tmp_path: Path) -> None:
+    ruta = escribir_documento(tmp_path / "uno.odt", "Título", [SECCIONES[0]])
+    with zipfile.ZipFile(ruta) as paquete:
+        contenido = paquete.read("content.xml").decode("utf-8")
+    assert "Índice" not in contenido
+
+
+def test_el_odt_lleva_encabezado_y_pie_con_numero(tmp_path: Path) -> None:
+    ruta = escribir_documento(
+        tmp_path / "salida.odt",
+        "Título",
+        SECCIONES,
+        unidad="UD1",
+        asignatura="Bases de datos",
+    )
+    with zipfile.ZipFile(ruta) as paquete:
+        estilos = paquete.read("styles.xml").decode("utf-8")
+    assert "<style:header>" in estilos
+    assert "UD1" in estilos
+    assert "Bases de datos" in estilos
+    assert "<style:footer>" in estilos
+    assert "text:page-number" in estilos
+
+
+def test_la_numeracion_de_segundo_nivel_sigue_al_primero(tmp_path: Path) -> None:
+    secciones = [
+        Seccion("Uno", ["cosa"]),
+        Seccion("Sub de uno", ["cosa"], nivel=2),
+        Seccion("Dos", ["cosa"]),
+        Seccion("Sub de dos", ["cosa"], nivel=2),
+    ]
+    ruta = escribir_documento(tmp_path / "niveles.odt", "Título", secciones)
+    with zipfile.ZipFile(ruta) as paquete:
+        contenido = paquete.read("content.xml").decode("utf-8")
+    assert "1.1 Sub de uno" in contenido
+    assert "2.1 Sub de dos" in contenido
+
+
+def test_el_docx_enlaza_el_indice_y_pone_cabecera_y_pie(tmp_path: Path) -> None:
+    ruta = escribir_documento(
+        tmp_path / "salida.docx",
+        "Título",
+        SECCIONES,
+        unidad="Tema 3",
+        asignatura="Sistemes Informàtics",
+    )
+    with zipfile.ZipFile(ruta) as paquete:
+        documento = paquete.read("word/document.xml").decode("utf-8")
+        cabecera = paquete.read("word/header1.xml").decode("utf-8")
+        pie = paquete.read("word/footer1.xml").decode("utf-8")
+    assert 'w:anchor="seccion1"' in documento
+    assert "w:bookmarkStart" in documento
+    assert "w:headerReference" in documento and "w:footerReference" in documento
+    assert "Tema 3" in cabecera and "Sistemes Informàtics" in cabecera
+    assert "PAGE" in pie
+
+
+def test_el_rtf_lleva_encabezado_y_pie(tmp_path: Path) -> None:
+    ruta = escribir_documento(
+        tmp_path / "salida.rtf",
+        "Título",
+        SECCIONES,
+        unidad="UD2",
+        asignatura="Lenguaje de Marcas",
+    )
+    texto = ruta.read_text(encoding="utf-8")
+    assert r"{\header" in texto
+    assert "UD2" in texto and "Lenguaje de Marcas" in texto
+    assert r"{\footer" in texto
+    assert r"\fldinst PAGE" in texto
+
+
+def test_el_rtf_escapa_las_tildes_para_windows(tmp_path: Path) -> None:
+    """El RTF se guarda como cp1252: las tildes van con código, no en UTF-8."""
+    ruta = escribir_documento(tmp_path / "salida.rtf", "Título", SECCIONES)
+    texto = ruta.read_text(encoding="utf-8")
+    assert "á" not in texto, "los bytes UTF-8 crudos se ven de churro en Word"
+    assert r"T\'edtulo" in texto
+    assert r"P\'e1gina" in texto
+
+
+def test_la_separacion_entre_parrafos_va_en_los_estilos() -> None:
+    """La separación la pone el formato, no espacios metidos a mano."""
+    from tareas.documentos import _STYLES_DOCX, _styles_odt
+
+    assert "margin-bottom" in _styles_odt("", "")
+    assert 'w:spacing w:after="160"' in _STYLES_DOCX
+
+
 def test_el_formato_se_elige_segun_el_sistema() -> None:
     """Cada sistema operativo tiene su formato preferido, y todos se pueden escribir."""
     from tareas.documentos import PREFERENCIAS
