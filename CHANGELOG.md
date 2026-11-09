@@ -6,6 +6,30 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+### Añadido
+
+- **Los documentos generados van presentados**: los apartados se numeran
+  («1.», «1.1»…), el índice queda enlazado con cada apartado (en .odt y
+  .docx se puede pinchar para saltar), el encabezado lleva la unidad a la
+  izquierda y la asignatura a la derecha, y el pie lleva el número de
+  página. Los cuatro formatos (ODT, DOCX, RTF y TXT) se presentan igual.
+- **Las listas numeradas conservan su número**: el orden de un ejercicio o
+  de unos pasos era información, y se convertía en viñetas.
+- **Encabezado y pie también en RTF** (WordPad/Word) con número de página.
+
+### Corregido
+
+- **Separación entre párrafos y títulos.** El texto corrido quedaba pegado
+  al título del apartado siguiente; ahora la separación la ponen los estilos
+  del documento (márgenes en ODT, `spacing` en DOCX, `\sa`/`\sb` en RTF).
+- **El RTF se veía de churro en Windows.** Se guardaba en UTF-8 declarando
+  cp1252; ahora las tildes y símbolos van escapados con su código RTF.
+- **`resumir` y `evaluar` ya no parecen colgados.** Consultar al modelo tarda
+  minutos (y más si pide búsquedas en internet), pero la terminal no mostraba
+  nada y la herramienta parecía no funcionar. Ahora hay un indicador de
+  progreso que avisa de que se está consultando al modelo y de que puede
+  tardar unos minutos.
+
 ## [v2.2.1] — 2026-11-04
 
 Arreglo de `tareas resumir`: el documento se quedaba con una línea

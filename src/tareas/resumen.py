@@ -13,6 +13,7 @@ claramente que se ha hecho sin IA.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .busqueda import Fuente
@@ -260,7 +261,13 @@ def escribir_resumen(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
 
     destino = carpeta / "resumenes"
     nombre = f"{_base(ficha.nombre_original)}_resumido{formato or formato_preferido()}"
-    return escribir_documento(destino / nombre, titulo, bloques)
+    return escribir_documento(
+        destino / nombre,
+        titulo,
+        bloques,
+        unidad=unidad_del_documento(ficha),
+        asignatura=ficha.asignatura,
+    )
 
 
 
@@ -269,6 +276,29 @@ def _base(nombre: str) -> str:
     from .nombres import separar_extension
 
     return separar_extension(nombre)[0]
+
+
+#: Las formas en que una unidad puede estar escrita en el nombre del fichero
+#: o en las primeras líneas del documento: «UD1.», «Tema 3», «Unitat 2»…
+RE_UNIDAD = re.compile(
+    r"\b((?:ud|unitat|unidad|tema|bloque|cap[ií]tulo|parte)\s*\.?\s*\d+)\b",
+    re.IGNORECASE,
+)
+
+
+def unidad_del_documento(ficha: Ficha) -> str:
+    """La unidad a la que parece pertenecer el documento, si se ve clara.
+
+    Se busca en el nombre del fichero y en las primeras líneas del contenido,
+    que es donde los apuntes suelen llevar «UD1.» o «Tema 3». El resultado va
+    en el encabezado de los documentos generados, con la asignatura al lado.
+    """
+    candidatos = [ficha.nombre_original, " ".join(ficha.contenido.splitlines()[:3])]
+    for texto in candidatos:
+        encontrada = RE_UNIDAD.search(texto)
+        if encontrada:
+            return encontrada.group(1).strip().rstrip(".")
+    return ""
 
 
 def buscar_ficha(carpeta: Path, nombre: str, carpetas: list | None = None) -> Ficha:

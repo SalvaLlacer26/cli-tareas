@@ -286,7 +286,7 @@ def construir_secciones(
 def escribir_evaluacion(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
     """Escribe el fichero de ejercicios en la carpeta «ejercicios»."""
     from .documentos import formato_preferido
-    from .resumen import _base
+    from .resumen import _base, unidad_del_documento
 
     contexto = resumen_previo(Path(carpeta), ficha.nombre_original)
     secciones, nota, fuentes = construir_secciones(ficha, con_ia=True, contexto_extra=contexto)
@@ -299,4 +299,10 @@ def escribir_evaluacion(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
 
     destino = carpeta / "ejercicios"
     nombre = f"{_base(ficha.nombre_original)}_test{formato or formato_preferido()}"
-    return escribir_documento(destino / nombre, titulo, bloques)
+    return escribir_documento(
+        destino / nombre,
+        titulo,
+        bloques,
+        unidad=unidad_del_documento(ficha),
+        asignatura=ficha.asignatura,
+    )

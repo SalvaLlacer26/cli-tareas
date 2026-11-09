@@ -240,7 +240,11 @@ def resumir(
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
-        ruta = escribir_resumen(ficha, destino, formato_preferido())
+        with consola.status(
+            f"Resumiendo «{escape(archivo)}» con el modelo: puede tardar unos minutos…",
+            spinner="dots",
+        ):
+            ruta = escribir_resumen(ficha, destino, formato_preferido())
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
@@ -265,7 +269,11 @@ def evaluar(
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
-        ruta = escribir_evaluacion(ficha, destino, formato_preferido())
+        with consola.status(
+            f"Preparando ejercicios de «{escape(archivo)}» con el modelo: puede tardar unos minutos…",
+            spinner="dots",
+        ):
+            ruta = escribir_evaluacion(ficha, destino, formato_preferido())
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
