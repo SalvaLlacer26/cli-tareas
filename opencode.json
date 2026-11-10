@@ -22,7 +22,7 @@
       "uv run tareas validar *": "allow",
       "uv run pytest *": "allow",
       "git commit *": "ask",
-      "git push *": "deny",
+      "git push *": "ask",
       "git reset *": "deny",
       "rm *": "deny",
       "sudo *": "deny"
