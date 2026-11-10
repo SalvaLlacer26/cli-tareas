@@ -18,6 +18,11 @@ class Motor:
     """Ejecuta acciones sobre carpetas."""
 
     def __init__(self, acciones: list[dict]) -> None:
+        # Aserción de desarrollo: config.py ya ha validado el JSON antes de
+        # llegar aquí; si esto falla, hay un llamador que se saltó la validación.
+        assert all(
+            isinstance(accion, dict) and accion.get("nombre") for accion in acciones
+        ), "toda acción necesita su nombre antes de montar el motor"
         self.acciones = {a["nombre"]: Accion.desde_config(a) for a in acciones}
 
     @staticmethod

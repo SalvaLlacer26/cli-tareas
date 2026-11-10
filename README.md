@@ -42,6 +42,9 @@ cp acciones.json ~/.config/tareas/acciones.json
 
 | Comando | Qué hace |
 |---|---|
+| `tareas version` | Muestra la versión instalada. |
+| `tareas listar [CARPETA] [--json]` | Lista los ficheros de la carpeta con nombre, tipo, tamaño y fecha. Con `--json`, JSON limpio sin colores, para tuberías y otros programas. |
+| `tareas acciones` | Lista las acciones del fichero de configuración con su tipo, si piden confirmación y su descripción, más las carpetas (asignaturas). |
 | `tareas analizar [CARPETA]` | Analiza la carpeta y el contenido de cada fichero, renombra los que tienen nombres incompatibles y escribe una ficha `.md` por documento con los datos para clasificarlo. Muestra una tabla con la asignatura de cada fichero y pide que confirmes el análisis. |
 | `tareas organizar [CARPETA]` | Mueve cada documento a la carpeta de su asignatura usando las fichas, y le devuelve el nombre original. Muestra un resumen. |
 | `tareas deshacer [CARPETA]` | Deshace lo anterior: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
