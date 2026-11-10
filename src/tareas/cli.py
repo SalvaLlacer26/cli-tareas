@@ -11,7 +11,9 @@ Si no se pone, se trabaja sobre la carpeta en la que está la terminal.
 
 from __future__ import annotations
 
+import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -28,6 +30,7 @@ from tareas.config import cargar
 from tareas.documentos import formato_preferido
 from tareas.errores import TareasError
 from tareas.evaluacion import escribir_evaluacion
+from tareas.ia import ProveedorIA
 from tareas.motor import Motor
 from tareas.organizador import deshacer, organizar
 from tareas.resumen import buscar_ficha, escribir_resumen
@@ -240,10 +243,11 @@ def resumir(
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
-        with consola.status(
-            f"Resumiendo «{escape(archivo)}» con el modelo: puede tardar unos minutos…",
-            spinner="dots",
-        ):
+        if ProveedorIA.desde_configuracion().disponible:
+            aviso = f"Resumiendo «{escape(archivo)}» con el modelo: puede tardar unos minutos…"
+        else:
+            aviso = f"Sin modelo configurado: resumiendo «{escape(archivo)}» sin IA."
+        with consola.status(aviso, spinner="dots"):
             ruta = escribir_resumen(ficha, destino, formato_preferido())
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
@@ -269,16 +273,137 @@ def evaluar(
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
-        with consola.status(
-            f"Preparando ejercicios de «{escape(archivo)}» con el modelo: puede tardar unos minutos…",
-            spinner="dots",
-        ):
+        if ProveedorIA.desde_configuracion().disponible:
+            aviso = f"Preparando ejercicios de «{escape(archivo)}» con el modelo: puede tardar unos minutos…"
+        else:
+            aviso = f"Sin modelo configurado: preparando ejercicios de «{escape(archivo)}» sin IA."
+        with consola.status(aviso, spinner="dots"):
             ruta = escribir_evaluacion(ficha, destino, formato_preferido())
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     consola.print(f"[green]Ejercicios creados:[/green] {escape(str(ruta))}")
+
+
+@app.command()
+def version() -> None:
+    """Muestra la versión instalada."""
+    consola.print(__version__)
+
+
+def _tamano_legible(pixels: int) -> str:
+    """Un tamaño en bytes, dicho como lo diría una persona: «1,2 MB»."""
+    for unidad in ("B", "KB", "MB", "GB"):
+        if pixels < 1024 or unidad == "GB":
+            if unidad == "B":
+                return f"{pixels} {unidad}"
+            return f"{pixels / 1024:.1f} {unidad}"
+        pixels /= 1024
+    return f"{pixels:.1f} GB"
+
+
+@app.command()
+def listar(
+    carpeta: Annotated[
+        Path | None,
+        typer.Argument(help="Carpeta que se lista (por defecto, la actual)."),
+    ] = None,
+    json_salida: Annotated[
+        bool,
+        typer.Option("--json", help="Salida en JSON, para otros programas."),
+    ] = False,
+) -> None:
+    """Lista los ficheros de una carpeta: nombre, tipo, tamaño y fecha."""
+    destino = carpeta_de_trabajo(carpeta)
+    if not destino.is_dir():
+        consola_err.print(
+            f"[red]Error:[/red] No existe la carpeta «{escape(str(destino))}»."
+        )
+        raise typer.Exit(code=1)
+
+    entradas = [
+        ruta for ruta in sorted(destino.iterdir(), key=lambda p: p.name.lower())
+        if not ruta.name.startswith(".")
+    ]
+
+    if json_salida:
+        # stdout limpio: sin colores ni tablas, solo JSON para quien pipee.
+        datos = []
+        for ruta in entradas:
+            info = ruta.stat()
+            datos.append({
+                "nombre": ruta.name,
+                "tipo": (
+                    "carpeta"
+                    if ruta.is_dir()
+                    else (ruta.suffix.lower().lstrip(".") or "sin extensión")
+                ),
+                "tamano": info.st_size,
+                "modificado": datetime.fromtimestamp(info.st_mtime).isoformat(
+                    timespec="seconds"
+                ),
+            })
+        typer.echo(json.dumps(datos, ensure_ascii=False, indent=2))
+        return
+
+    tabla = Table(title=f"Contenido de {escape(str(destino))}")
+    tabla.add_column("Fichero")
+    tabla.add_column("Tipo")
+    tabla.add_column("Tamaño", justify="right")
+    tabla.add_column("Modificado")
+    for ruta in entradas:
+        info = ruta.stat()
+        tipo = (
+            "carpeta"
+            if ruta.is_dir()
+            else (ruta.suffix.lower().lstrip(".") or "sin extensión")
+        )
+        tabla.add_row(
+            escape(ruta.name),
+            tipo,
+            "—" if ruta.is_dir() else _tamano_legible(info.st_size),
+            datetime.fromtimestamp(info.st_mtime).strftime("%Y-%m-%d %H:%M"),
+        )
+    if entradas:
+        consola.print(tabla)
+    else:
+        consola.print(f"La carpeta «{escape(str(destino))}» está vacía.")
+
+
+@app.command()
+def acciones(ctx: typer.Context) -> None:
+    """Lista las acciones del fichero de configuración con su descripción."""
+    try:
+        configuracion = cargar(ctx.obj)
+        motor = Motor(configuracion.acciones)
+    except TareasError as exc:
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
+        raise typer.Exit(code=exc.codigo_salida) from exc
+
+    tabla = Table(title="Acciones del fichero de configuración")
+    tabla.add_column("Acción")
+    tabla.add_column("Tipo")
+    tabla.add_column("Pide confirmación")
+    tabla.add_column("Descripción")
+    for accion in motor.acciones.values():
+        tabla.add_row(
+            escape(accion.nombre),
+            escape(accion.tipo),
+            "sí" if accion.destructiva else "no",
+            escape(accion.descripcion),
+        )
+    if motor.acciones:
+        consola.print(tabla)
+    else:
+        consola.print("El fichero de configuración no tiene ninguna acción.")
+
+    if configuracion.carpetas:
+        carpetas = ", ".join(
+            str(carpeta.etiqueta or carpeta.clave)
+            for carpeta in configuracion.carpetas
+        )
+        consola.print(f"[dim]Carpetas (asignaturas): {escape(carpetas)}[/dim]")
 
 
 @app.command(name="validar")

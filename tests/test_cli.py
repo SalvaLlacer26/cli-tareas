@@ -73,10 +73,13 @@ def test_la_ayuda_general_sale_sin_argumentos() -> None:
     assert "organizar" in resultado.output
 
 
-def test_comandos_lista_los_ocho_comandos() -> None:
+def test_comandos_lista_todos_los_comandos() -> None:
     resultado = runner.invoke(app, ["comandos"])
     assert resultado.exit_code == 0
-    for nombre in ("analizar", "organizar", "deshacer", "resumir", "evaluar", "comandos"):
+    for nombre in (
+        "version", "listar", "acciones", "analizar", "organizar", "deshacer",
+        "resumir", "evaluar", "comandos",
+    ):
         assert nombre in resultado.output
 
 
@@ -86,6 +89,65 @@ def test_comandos_muestra_el_autor_y_el_aviso_legal() -> None:
     assert "1º DAM" in resultado.output
     assert "2026" in resultado.output
     assert "Todos los derechos reservados" in resultado.output
+
+
+# ---------------------------------------------------------------- version
+
+
+def test_version_muestra_el_numero_instalado() -> None:
+    from tareas import __version__
+
+    resultado = runner.invoke(app, ["version"])
+    assert resultado.exit_code == 0
+    assert __version__ in resultado.output
+
+
+# ----------------------------------------------------------------- listar
+
+
+def test_listar_ensena_nombre_tipo_tamano_y_fecha(tmp_path: Path) -> None:
+    (tmp_path / "Apuntes de Física.pdf").write_bytes(b"x" * 120)
+    (tmp_path / "foto.jpg").write_bytes(b"yy")
+    resultado = runner.invoke(app, ["listar", str(tmp_path)])
+    assert resultado.exit_code == 0
+    assert "Apuntes de Física.pdf" in plano(resultado.output)
+    assert "120 B" in resultado.output
+    assert "pdf" in resultado.output
+
+
+def test_listar_en_json_es_json_valido(tmp_path: Path) -> None:
+    """La salida --json entra por una tubería sin colores ni tablas."""
+    (tmp_path / "a.txt").write_text("hola", encoding="utf-8")
+    resultado = runner.invoke(app, ["listar", str(tmp_path), "--json"])
+    assert resultado.exit_code == 0
+    datos = json.loads(resultado.output)
+    assert datos[0]["nombre"] == "a.txt"
+    assert datos[0]["tamano"] == 4
+    assert datos[0]["tipo"] == "txt"
+
+
+def test_listar_de_una_carpeta_inexistente_sale_con_codigo_1(tmp_path: Path) -> None:
+    resultado = runner.invoke(app, ["listar", str(tmp_path / "no-existe")])
+    assert resultado.exit_code == 1
+    assert "No existe la carpeta" in plano(resultado.output)
+
+
+# ---------------------------------------------------------------- acciones
+
+
+def test_acciones_lista_las_del_fichero_de_configuracion(tmp_path: Path) -> None:
+    config = escribir_config(tmp_path)
+    resultado = runner.invoke(app, ["--config", str(config), "acciones"])
+    assert resultado.exit_code == 0
+    assert "mover-cosas" in resultado.output
+    assert "Bases de dades" in resultado.output
+
+
+def test_acciones_con_config_rota_sale_con_codigo_3(tmp_path: Path) -> None:
+    config = tmp_path / "acciones.json"
+    config.write_text("{ esto no es json", encoding="utf-8")
+    resultado = runner.invoke(app, ["--config", str(config), "acciones"])
+    assert resultado.exit_code == 3
 
 
 # ------------------------------------------------------------- analizar

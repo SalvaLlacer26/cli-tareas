@@ -6,8 +6,22 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.2.3] — 2026-11-09
+
+Los documentos generados van presentados como un trabajo de verdad, y la
+CLI suma los comandos de referencia del curso: `version`, `listar` y
+`acciones`.
+
 ### Añadido
 
+- **Comandos `tareas version`, `tareas listar` y `tareas acciones`.** La
+  versión instalada; el contenido de una carpeta (nombre, tipo, tamaño y
+  fecha, con `--json` limpio para tuberías); y las acciones del fichero de
+  configuración con su tipo, su descripción y si piden confirmación.
+- **`ProveedorIA`: la puerta única al modelo.** Una fachada con fábrica
+  (`desde_configuracion`) que lee variables y `.env`: si no hay clave o
+  dirección, dice que no está disponible y la CLI lo enseña en el aviso de
+  `resumir` y `evaluar`.
 - **Los documentos generados van presentados**: los apartados se numeran
   («1.», «1.1»…), el índice queda enlazado con cada apartado (en .odt y
   .docx se puede pinchar para saltar), el encabezado lleva la unidad a la
@@ -29,6 +43,15 @@ Todas las novedades de `tareas` van aquí. El formato sigue
   nada y la herramienta parecía no funcionar. Ahora hay un indicador de
   progreso que avisa de que se está consultando al modelo y de que puede
   tardar unos minutos.
+
+## [v2.2.2] — 2026-11-05
+
+### Corregido
+
+- **Elige la fuente más general cuando dos títulos encajan igual.** Buscar
+  «bases de datos» podía devolver «Base de datos jerárquica» antes que
+  «Base de datos»: el artículo general explica mejor el tema, así que entre
+  dos títulos con las mismas coincidencias gana el más corto.
 
 ## [v2.2.1] — 2026-11-04
 
