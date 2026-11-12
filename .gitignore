@@ -5,9 +5,15 @@
 __pycache__/
 *.egg-info
 dist/
+.pytest_cache/
 
 # Secretos: claves de API y configuración privada. NUNCA al repo.
+# Se ignoran también las variantes (.env.local, .env.produccion...) y solo se
+# deja pasar el ejemplo, que no contiene la clave real.
 .env
+.env.*
+.envrc
+!.env.example
 
 # Carpetas que crea la propia herramienta si se ejecuta dentro del repo.
 /md/
