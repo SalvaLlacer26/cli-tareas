@@ -19,3 +19,6 @@ dist/
 /md/
 /resumenes/
 /ejercicios/
+
+# Copia personal de la salida de «tareas comandos» (es un volcado, no fuente).
+/comandos.txt
