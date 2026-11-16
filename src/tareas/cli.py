@@ -18,14 +18,16 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
 from tareas import __version__
 from tareas import agrupador
+from tareas import examenes
 from tareas.analizador import CARPETA_FICHAS, analizar
-from tareas.comandos import ANIO, AVISO_LEGAL, AUTOR, COMANDOS, CURSO
+from tareas.comandos import ANIO, AVISO_LEGAL, AUTOR, COMANDOS, CURSO, SIGUIENTES
 from tareas.config import cargar
 from tareas.documentos import formato_preferido
 from tareas.errores import TareasError
@@ -43,6 +45,28 @@ app = typer.Typer(
 
 consola = Console()
 consola_err = Console(stderr=True)
+
+#: Paleta de la herramienta. Colores legibles sobre fondo claro y oscuro, que
+#: sirven para separar unos apartados de otros sin cansar la vista.
+ACENTO = "bold cyan"       # títulos de tabla y nombres de apartado
+NOMBRE = "bold magenta"    # una orden o un dato que destaca
+CORRECTO = "green"         # lo que ha salido bien
+AVISO = "yellow"           # algo a revisar, sin ser error
+ERROR = "red"              # lo que ha fallado
+BORDE = "blue"             # el marco de las tablas
+
+
+def _tabla(titulo: str = "", **extras) -> Table:
+    """Una tabla con el estilo de la herramienta: marco redondeado y azules."""
+    return Table(
+        title=escape(titulo) if titulo else None,
+        title_style=ACENTO,
+        title_justify="left",
+        header_style=f"white on {BORDE}",
+        box=box.ROUNDED,
+        border_style=BORDE,
+        **extras,
+    )
 
 
 def carpeta_de_trabajo(carpeta: Path | None) -> Path:
@@ -76,6 +100,28 @@ def simbolo(bonito: str, alternativa: str) -> str:
     return bonito
 
 
+def _despues_de(nombre: str) -> None:
+    """Cierra cada comando con «¿Qué quieres hacer ahora?».
+
+    Lista, una por línea y con una descripción corta, las acciones que tienen
+    sentido justo después del comando que se acaba de terminar. Debajo recuerda
+    que «tareas comandos» da la información detallada de todo. «comandos» no se
+    cuela entre las sugerencias: solo aparece ahí abajo. Solo en una terminal de
+    verdad; en scripts, tuberías y CI el resultado debe salir limpio.
+    """
+    if not sys.stdout.isatty():
+        return
+    consola.print()
+    consola.print(f"[{ACENTO}]¿Qué quieres hacer ahora?[/{ACENTO}]")
+    for siguiente, motivo in SIGUIENTES.get(nombre, []):
+        consola.print(f"  [{NOMBRE}]tareas {siguiente}[/]  [dim]{escape(motivo)}[/dim]")
+    consola.print()
+    consola.print(
+        "  Para información más detallada introduce el comando: "
+        f"[{NOMBRE}]tareas comandos[/]"
+    )
+
+
 @app.callback()
 def principal(
     ctx: typer.Context,
@@ -100,12 +146,13 @@ def analizar_cmd(
     try:
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
-        resultado = analizar(destino, configuracion.carpetas)
+        with consola.status(f"Leyendo y analizando «{escape(str(destino))}»…", spinner="dots"):
+            resultado = analizar(destino, configuracion.carpetas)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
-    tabla = Table(title=f"Análisis de {escape(str(destino))}")
+    tabla = _tabla(f"Análisis de {destino}")
     tabla.add_column("Archivo")
     tabla.add_column("Estado")
     tabla.add_column("Asignatura")
@@ -139,10 +186,10 @@ def analizar_cmd(
             consola.print(f"  {escape(antes)}  ->  {escape(despues)}")
 
     consola.print(
-        f"Fichas creadas: {resultado.fichas} en «{CARPETA_FICHAS}» · "
-        f"{resultado.analizables} analizables · "
-        f"{resultado.sin_clasificar} sin clasificar · "
-        f"{resultado.invalidos} con formato inválido"
+        f"[bold]Fichas creadas:[/] {resultado.fichas} en «{CARPETA_FICHAS}» · "
+        f"[{CORRECTO}]{resultado.analizables} analizables[/] · "
+        f"[{AVISO}]{resultado.sin_clasificar} sin clasificar[/] · "
+        f"[{ERROR}]{resultado.invalidos} con formato inválido[/]"
     )
 
     typer.confirm(
@@ -150,6 +197,7 @@ def analizar_cmd(
         abort=True,
     )
     consola.print("[green]Análisis confirmado.[/green]")
+    _despues_de("analizar")
 
 
 @app.command(name="organizar")
@@ -164,7 +212,8 @@ def organizar_cmd(
     try:
         cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
-        resultado = organizar(destino)
+        with consola.status("Moviendo cada documento a su asignatura…", spinner="dots"):
+            resultado = organizar(destino)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
@@ -172,7 +221,7 @@ def organizar_cmd(
     if not resultado.movimientos:
         consola.print("No hay ningún documento que mover.")
 
-    tabla = Table(title=f"Documentos movidos a {escape(str(destino))}")
+    tabla = _tabla(f"Documentos movidos a {destino}")
     tabla.add_column("Documento")
     tabla.add_column("Carpeta de destino")
     for movimiento in resultado.movimientos:
@@ -181,17 +230,18 @@ def organizar_cmd(
         consola.print(tabla)
 
     if resultado.por_carpeta:
-        consola.print("Resumen por carpeta:")
+        consola.print(f"[{ACENTO}]Resumen por carpeta:[/]")
         for carpeta_destino, cantidad in sorted(resultado.por_carpeta.items()):
-            consola.print(f"  {escape(carpeta_destino)}: {cantidad} documento(s)")
+            consola.print(f"  {escape(carpeta_destino)}: [{NOMBRE}]{cantidad}[/] documento(s)")
 
-    consola.print(f"Total: {resultado.total} documento(s) movido(s).")
+    consola.print(f"[bold]Total:[/] [{CORRECTO}]{resultado.total}[/] documento(s) movido(s).")
 
     if resultado.sin_ficha:
         consola.print(
-            f"[yellow]{len(resultado.sin_ficha)} documento(s) se han quedado sin mover "
-            "porque su formato no se puede analizar.[/yellow]"
+            f"[{AVISO}]{len(resultado.sin_ficha)} documento(s) se han quedado sin mover "
+            "porque su formato no se puede analizar.[/]"
         )
+    _despues_de("organizar")
 
 
 @app.command(name="deshacer")
@@ -202,11 +252,12 @@ def deshacer_cmd(
         typer.Argument(help="Carpeta donde se deshace (por defecto, la actual)."),
     ] = None,
 ) -> None:
-    """Devuelve los documentos a su carpeta de origen, con su nombre original."""
+    """Devuelve los documentos a su origen: deshace «organizar» y «clasificar»."""
     try:
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
-        resultado = deshacer(destino, configuracion.carpetas)
+        with consola.status("Devolviendo los documentos a su carpeta de origen…", spinner="dots"):
+            resultado = deshacer(destino, configuracion.carpetas)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
@@ -214,7 +265,7 @@ def deshacer_cmd(
     if not resultado.movimientos:
         consola.print("No hay ningún documento que devolver.")
 
-    tabla = Table(title=f"Documentos devueltos a {escape(str(destino))}")
+    tabla = _tabla(f"Documentos devueltos a {destino}")
     tabla.add_column("Documento")
     tabla.add_column("Carpeta de origen")
     for movimiento in resultado.movimientos:
@@ -222,8 +273,9 @@ def deshacer_cmd(
     if resultado.movimientos:
         consola.print(tabla)
 
-    consola.print(f"Total: {resultado.total} documento(s) devuelto(s).")
+    consola.print(f"[bold]Total:[/] [{CORRECTO}]{resultado.total}[/] documento(s) devuelto(s).")
     consola.print(f"[dim]Las fichas de «{CARPETA_FICHAS}» se conservan.[/dim]")
+    _despues_de("deshacer")
 
 
 @app.command()
@@ -254,6 +306,7 @@ def resumir(
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     consola.print(f"[green]Resumen creado:[/green] {escape(str(ruta))}")
+    _despues_de("resumir")
 
 
 @app.command()
@@ -284,12 +337,83 @@ def evaluar(
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     consola.print(f"[green]Ejercicios creados:[/green] {escape(str(ruta))}")
+    _despues_de("evaluar")
+
+
+@app.command(name="formulario_evaluar")
+def formulario_evaluar(
+    ctx: typer.Context,
+    archivo: Annotated[
+        str,
+        typer.Argument(help="Nombre del archivo sobre el que se hacen los ejercicios."),
+    ],
+    carpeta: Annotated[
+        Path | None,
+        typer.Argument(help="Carpeta donde está el archivo (por defecto, la actual)."),
+    ] = None,
+    abrir: Annotated[
+        bool,
+        typer.Option("--abrir/--no-abrir", help="Abrir el navegador automáticamente."),
+    ] = True,
+) -> None:
+    """(En pruebas) Examen interactivo en el navegador que corrige la IA.
+
+    Prepara los mismos ejercicios que «evaluar» pero en un formulario HTML:
+    tipo test con botones de opción y preguntas escritas con su hueco. Al
+    enviar, se corrige el tipo test y la IA revisa lo escrito. El servidor
+    solo escucha en tu propio equipo; pulsa Enter aquí para cerrarlo.
+    """
+    try:
+        configuracion = cargar(ctx.obj)
+        destino = carpeta_de_trabajo(carpeta)
+        ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
+        from .evaluacion import resumen_previo
+
+        contexto = resumen_previo(destino, ficha.nombre_original)
+        proveedor = ProveedorIA.desde_configuracion()
+        con_ia = proveedor.disponible
+        aviso = (
+            f"Preparando el examen interactivo de «{escape(archivo)}» con el modelo…"
+            if con_ia
+            else f"Sin modelo: preparando un examen sencillo de «{escape(archivo)}»."
+        )
+        with consola.status(aviso, spinner="dots"):
+            try:
+                preguntas = examenes.pedir_bateria(ficha, contexto)
+            except TareasError:
+                con_ia = False
+                preguntas = examenes.bateria_extractiva(ficha)
+
+        titulo = f"Ejercicios · {ficha.nombre_original}"
+        servidor, url = examenes.crear_servidor(titulo, preguntas, con_ia)
+    except TareasError as exc:
+        consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
+        raise typer.Exit(code=exc.codigo_salida) from exc
+
+    consola.print(f"[green]Examen listo:[/green] {len(preguntas)} pregunta(s).")
+    if abrir and examenes.abrir_navegador(url):
+        consola.print(f"Se ha abierto el navegador en [bold]{escape(url)}[/bold].")
+    else:
+        consola.print(f"Abre en el navegador esta dirección: [bold]{escape(url)}[/bold]")
+    consola.print("[dim]Responde y pulsa «Enviar respuestas». Aquí abajo, Enter para cerrar.[/dim]")
+    try:
+        with consola.status("Examen abierto, esperando tus respuestas…", spinner="dots"):
+            input()
+    except (KeyboardInterrupt, EOFError):
+        pass
+    finally:
+        servidor.shutdown()
+        servidor.server_close()
+    consola.print("Examen cerrado.")
+    _despues_de("formulario_evaluar")
 
 
 @app.command()
 def version() -> None:
     """Muestra la versión instalada."""
-    consola.print(__version__)
+    with consola.status("Mostrando la versión…"):
+        consola.print(f"[{ACENTO}]tareas[/] [bold]{__version__}[/bold]")
+    _despues_de("version")
 
 
 def _tamano_legible(pixels: int) -> str:
@@ -322,10 +446,11 @@ def listar(
         )
         raise typer.Exit(code=1)
 
-    entradas = [
-        ruta for ruta in sorted(destino.iterdir(), key=lambda p: p.name.lower())
-        if not ruta.name.startswith(".")
-    ]
+    with consola.status(f"Leyendo «{escape(str(destino))}»…"):
+        entradas = [
+            ruta for ruta in sorted(destino.iterdir(), key=lambda p: p.name.lower())
+            if not ruta.name.startswith(".")
+        ]
 
     if json_salida:
         # stdout limpio: sin colores ni tablas, solo JSON para quien pipee.
@@ -347,7 +472,7 @@ def listar(
         typer.echo(json.dumps(datos, ensure_ascii=False, indent=2))
         return
 
-    tabla = Table(title=f"Contenido de {escape(str(destino))}")
+    tabla = _tabla(f"Contenido de {destino}")
     tabla.add_column("Fichero")
     tabla.add_column("Tipo")
     tabla.add_column("Tamaño", justify="right")
@@ -369,6 +494,7 @@ def listar(
         consola.print(tabla)
     else:
         consola.print(f"La carpeta «{escape(str(destino))}» está vacía.")
+    _despues_de("listar")
 
 
 @app.command()
@@ -376,12 +502,13 @@ def acciones(ctx: typer.Context) -> None:
     """Lista las acciones del fichero de configuración con su descripción."""
     try:
         configuracion = cargar(ctx.obj)
-        motor = Motor(configuracion.acciones)
+        with consola.status("Leyendo las acciones de la configuración…"):
+            motor = Motor(configuracion.acciones)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
-    tabla = Table(title="Acciones del fichero de configuración")
+    tabla = _tabla("Acciones del fichero de configuración")
     tabla.add_column("Acción")
     tabla.add_column("Tipo")
     tabla.add_column("Pide confirmación")
@@ -404,13 +531,15 @@ def acciones(ctx: typer.Context) -> None:
             for carpeta in configuracion.carpetas
         )
         consola.print(f"[dim]Carpetas (asignaturas): {escape(carpetas)}[/dim]")
+    _despues_de("acciones")
 
 
 @app.command(name="validar")
 def validar_cmd(ctx: typer.Context) -> None:
     """Comprueba el fichero de configuración y dice exactamente qué campo falla."""
     try:
-        configuracion = cargar(ctx.obj)
+        with consola.status("Comprobando el fichero de configuración…"):
+            configuracion = cargar(ctx.obj)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
@@ -419,6 +548,7 @@ def validar_cmd(ctx: typer.Context) -> None:
         f"[green]{simbolo('✔', 'OK')} {len(configuracion.acciones)} acción(es) y "
         f"{len(configuracion.carpetas)} carpeta(s) válidas.[/green]"
     )
+    _despues_de("validar")
 
 
 @app.command(name="ejecutar")
@@ -447,18 +577,25 @@ def ejecutar_cmd(
         accion = motor.acciones.get(nombre)
         if accion is not None and accion.destructiva and not simular and not si:
             typer.confirm(f"«{escape(nombre)}» va a modificar ficheros. ¿Seguro?", abort=True)
-        resultados = motor.ejecutar(nombre, carpeta_de_trabajo(carpeta) if carpeta else None, simular)
+        with consola.status(
+            f"«{escape(nombre)}» trabajando…" + (" (simulación)" if simular else ""),
+            spinner="dots",
+        ):
+            resultados = motor.ejecutar(
+                nombre, carpeta_de_trabajo(carpeta) if carpeta else None, simular
+            )
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
     _pintar_resultados(nombre, resultados, simular)
+    _despues_de("ejecutar")
 
 
 def _pintar_resultados(nombre: str, resultados: list, simular: bool) -> None:
     """Pinta la tabla de resultados y el resumen de la ejecución."""
-    titulo = f"{escape(nombre)} (SIMULACIÓN: no se ha tocado nada)" if simular else escape(nombre)
-    tabla = Table(title=titulo)
+    titulo = f"{nombre} (SIMULACIÓN: no se ha tocado nada)" if simular else nombre
+    tabla = _tabla(titulo)
     tabla.add_column("Fichero")
     tabla.add_column("Destino")
     tabla.add_column("Estado")
@@ -468,8 +605,10 @@ def _pintar_resultados(nombre: str, resultados: list, simular: bool) -> None:
         destino = escape(str(resultado.destino)) if resultado.destino else "—"
         estado = resultado.estado
         if resultado.estado == "error":
-            estado = f"[red]error: {escape(resultado.error or '')}[/red]"
+            estado = f"[{ERROR}]error: {escape(resultado.error or '')}[/]"
             errores += 1
+        elif resultado.estado in ("hecho", "simulado"):
+            estado = f"[{CORRECTO}]{estado}[/]"
         tabla.add_row(escape(resultado.origen.name), destino, estado)
 
     if resultados:
@@ -481,11 +620,14 @@ def _pintar_resultados(nombre: str, resultados: list, simular: bool) -> None:
     simulados = sum(1 for r in resultados if r.estado == "simulado")
     saltados = sum(1 for r in resultados if r.estado == "saltado")
     consola.print(
-        f"{len(resultados)} fichero(s) · {hechos} hecho(s) · {simulados} simulado(s) "
-        f"· {saltados} saltado(s) · {errores} error(es)"
+        f"[dim]{len(resultados)} fichero(s)[/dim] · "
+        f"[{CORRECTO}]{hechos} hecho(s)[/] · "
+        f"[cyan]{simulados} simulado(s)[/] · "
+        f"[dim]{saltados} saltado(s)[/] · "
+        f"[{ERROR}]{errores} error(es)[/]"
     )
     if simular:
-        consola.print("Para hacerlo de verdad, repite la orden sin --simular.")
+        consola.print(f"[{AVISO}]Para hacerlo de verdad, repite la orden sin --simular.[/]")
     if errores:
         raise typer.Exit(code=1)
 
@@ -510,12 +652,19 @@ def clasificar_cmd(
     try:
         cargar(ctx.obj)
         origen = carpeta_de_trabajo(carpeta)
-        plan = agrupador.planear(origen, usar_ia=True)
+        with consola.status(
+            "Pidiendo al modelo que agrupe los documentos por su contenido: puede tardar unos minutos…",
+            spinner="dots",
+        ):
+            plan = agrupador.planear(origen, usar_ia=True)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
-    tabla = Table(title=f"Carpetas que se van a crear en {escape(str(destino.expanduser()))}")
+    if plan.aviso:
+        consola.print(f"[{AVISO}]{escape(plan.aviso)}[/]")
+
+    tabla = _tabla(f"Carpetas que se van a crear en {destino.expanduser()}")
     tabla.add_column("Carpeta")
     tabla.add_column("Documentos")
     tabla.add_column("Cantidad", justify="right")
@@ -526,40 +675,57 @@ def clasificar_cmd(
     if not typer.confirm("¿Quieres crear esas carpetas y mover los documentos?"):
         raise typer.Exit(code=1)
 
-    movidos, errores = agrupador.aplicar(origen, destino, plan)
+    with consola.status("Creando las carpetas y moviendo los documentos…", spinner="dots"):
+        movidos, errores = agrupador.aplicar(origen, destino, plan)
 
-    consola.print(f"Total: {len(movidos)} documento(s) movido(s).")
+    consola.print(f"[bold]Total:[/] [{CORRECTO}]{len(movidos)}[/] documento(s) movido(s).")
     for movimiento in movidos:
         consola.print(f"  {escape(movimiento)}")
+
+    sin_sitio = [
+        grupo
+        for grupo in plan.grupos
+        if grupo.nombre == agrupador.CARPETA_POR_CLASIFICAR
+    ]
+    for grupo in sin_sitio:
+        consola.print(
+            f"[{AVISO}]{len(grupo.documentos)} documento(s) no se han podido "
+            f"clasificar y están en la carpeta «{agrupador.CARPETA_POR_CLASIFICAR}»:[/]"
+        )
+        for nombre in grupo.documentos:
+            consola.print(f"  [{AVISO}]· {escape(nombre)}[/]")
+
     for error in errores:
-        consola_err.print(f"[yellow]{escape(error)}[/yellow]")
+        consola_err.print(f"[{AVISO}]{escape(error)}[/]")
 
     if plan.fuentes:
         consola.print(f"[dim]Fuentes consultadas: {len(plan.fuentes)}[/dim]")
 
     if errores:
         raise typer.Exit(code=1)
+    _despues_de("clasificar")
 
 
 @app.command(name="comandos")
 def comandos() -> None:
     """Muestra todos los comandos de la herramienta y para qué sirven."""
-    consola.print(f"[bold]tareas[/bold] {__version__}")
+    consola.print(f"[{ACENTO}]tareas[/] [bold]{__version__}[/bold]")
     consola.print("[dim]Tu propia herramienta de terminal: organiza tus apuntes por asignatura.[/dim]")
     consola.print()
 
     for ficha in COMANDOS:
-        consola.print(f"[bold cyan]{ficha.nombre}[/bold cyan]")
-        consola.print(f"  [bold]Uso:[/bold] {escape(ficha.uso)}")
+        consola.print(f"[{ACENTO}]{ficha.nombre}[/]")
+        consola.print(f"  [{NOMBRE}]Uso:[/] {escape(ficha.uso)}")
         for linea in _envolver(ficha.para_que):
             consola.print(f"  {escape(linea)}")
         if ficha.ejemplo:
-            consola.print(f"  [dim]Ejemplo: {escape(ficha.ejemplo)}[/dim]")
+            consola.print(f"  [dim]Ejemplo:[/] [dim]{escape(ficha.ejemplo)}[/dim]")
         consola.print()
 
-    consola.print(f"[bold]Creado por[/bold] {AUTOR}")
-    consola.print(f"[bold]Curso[/bold] {CURSO} · [bold]Año[/bold] {ANIO}")
-    consola.print(f"[dim]{AVISO_LEGAL}[/dim]")
+    consola.print(f"[{NOMBRE}]Creado por[/] {escape(AUTOR)}")
+    consola.print(f"[{NOMBRE}]Curso[/] {escape(CURSO)} · [{NOMBRE}]Año[/] {escape(ANIO)}")
+    consola.print(f"[dim]{escape(AVISO_LEGAL)}[/dim]")
+    _despues_de("comandos")
 
 
 def _corta(ruta: str) -> str:

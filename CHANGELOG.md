@@ -6,6 +6,70 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.4.0] — 2026-11-13
+
+`deshacer` también revierte `clasificar`, los exámenes salen con al menos 10
+preguntas y distintos en cada pasada, y toda la terminal gana color para
+distinguir apartados.
+
+### Añadido
+
+- **`deshacer` deshace también `clasificar`.** Al mover un documento, `clasificar`
+  deja apuntado en su ficha de dónde salió y dónde está, así que `tareas deshacer`
+  devuelve tanto lo de `organizar` como lo de `clasificar`.
+- **Exámenes de al menos 10 preguntas, y distintos cada vez.** `evaluar` y
+  `formulario_evaluar` piden mínimo 10 preguntas y, con una temperatura alta y
+  un enfoque que cambia en cada ejecución, sacan una batería diferente cada vez
+  (incluso sin modelo: la materia prima se baraja).
+- **Una línea en blanco entre pregunta y pregunta** en el documento de `evaluar`:
+  la última frase de un ejercicio ya no queda pegada al siguiente.
+- **`tareas comandos` fuera de las sugerencias.** El «¿Qué quieres hacer ahora?»
+  lista solo acciones con una línea corta de explicación, y debajo recuerda que
+  `tareas comandos` da la información detallada.
+- **Toda la terminal, con color.** Tablas, títulos, avisos y el cierre de cada
+  orden usan una paleta legible (azules, verdes, ámbar y magenta) para separar
+  unos apartados de otros.
+
+### Cambiado
+
+- **`evaluar-2` pasa a llamarse `formulario_evaluar`.** Mismo comando y misma
+  función; solo cambia el nombre, que describe mejor lo que hace.
+
+## [v2.3.0] — 2026-11-12
+
+`clasificar` ya no deja ningún documento atrás, la herramienta se despide
+sugiriendo el siguiente paso, y el modo pruebas estrena un examen
+interactivo en el navegador que corrige la IA.
+
+### Añadido
+
+- **`tareas evaluar-2` (en pruebas): el examen, en el navegador.** Prepara
+  los mismos ejercicios que `evaluar` pero como un formulario HTML: tipo test
+  con botones de opción y preguntas de desarrollo y cálculo con su hueco para
+  escribir. Al enviar, una página servida en `127.0.0.1` corrige el tipo test
+  y pasa a la IA lo escrito. El servidor solo escucha en el propio equipo y la
+  clave del modelo no sale del `.env`. Se cierra con Enter en la terminal.
+- **`clasificar` coloca TODO, también lo que no tiene texto.** Fotos e
+  instaladores (`.jpg`, `.deb`, `.zip`…) entran en el juego y el modelo los
+  juzga por su nombre y su tipo. Lo que el modelo deja fuera se le vuelve a
+  preguntar una segunda vez, y lo que siga sin sitio va a una carpeta **«Por
+  clasificar»** que la CLI enseña en la consola, pregunta por pregunta.
+- **Un indicador de trabajo en todas las órdenes.** `analizar`, `organizar`,
+  `deshacer`, `validar`, `ejecutar`, `clasificar`, `listar`, `acciones`,
+  `version` y `comandos` ya muestran su spinner mientras trabajan, como
+  venían haciendo `resumir` y `evaluar`.
+- **`¿Qué quieres hacer ahora?` al terminar cada orden.** Al cerrar un comando
+  (solo en una terminal de verdad), la herramienta sugiere las acciones que
+  tienen sentido a continuación y recuerda, en una línea, todo lo que sabe
+  hacer.
+
+### Corregido
+
+- **El tipo test de `evaluar` ya no viene con la respuesta en el enunciado.**
+  El modelo escribía «[b)]» junto a cada pregunta, y así no servía para
+  practicar. Las respuestas correctas van únicamente en el apartado
+  «Soluciones», al final del documento.
+
 ## [v2.2.3] — 2026-11-09
 
 Los documentos generados van presentados como un trabajo de verdad, y la
