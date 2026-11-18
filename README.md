@@ -48,8 +48,8 @@ cp acciones.json ~/.config/tareas/acciones.json
 | `tareas analizar [CARPETA]` | Analiza la carpeta y el contenido de cada fichero, renombra los que tienen nombres incompatibles y escribe una ficha `.md` por documento con los datos para clasificarlo. Muestra una tabla con la asignatura de cada fichero y pide que confirmes el análisis. |
 | `tareas organizar [CARPETA]` | Mueve cada documento a la carpeta de su asignatura usando las fichas, y le devuelve el nombre original. Muestra un resumen. |
 | `tareas deshacer [CARPETA]` | Deshace lo hecho por `organizar` y por `clasificar`: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
-| `tareas resumir 'ARCHIVO' [CARPETA]` | Crea un resumen del archivo (10 páginas como máximo, sin imágenes, organizado en apartados) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. |
-| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea una batería de ejercicios (mínimo 10 preguntas) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. La IA decide la mezcla de tipos y cada ejecución genera un examen distinto. |
+| `tareas resumir 'ARCHIVO' [CARPETA]` | Usa el archivo para identificar el tema, **investiga la teoría en internet** y escribe un resumen de estudio (con las fuentes al final) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. |
+| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea un examen sobre la teoría investigada del tema (mínimo 10 preguntas) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. Se puede aprobar estudiando el resumen de `resumir`, y cada ejecución genera un examen distinto. |
 | `tareas formulario_evaluar 'ARCHIVO' [CARPETA]` | **(En pruebas)** El mismo examen en un formulario HTML que abre en el navegador: tipo test con botones y preguntas escritas con su hueco. Al enviar, corrige en `127.0.0.1` y la IA revisa lo escrito. Se cierra con Enter. |
 | `tareas clasificar [CARPETA] --destino RUTA` | Crea en `RUTA` un grupo de carpetas **decidido por la IA** según el contenido, y mueve cada documento dentro. Coloca todos los ficheros (también fotos e instaladores, por su nombre y tipo); lo que no se pueda clasificar va a «Por clasificar». |
 | `tareas comandos` | Lista todos los comandos, cómo se usan y para qué sirven. |
@@ -124,9 +124,12 @@ volver a organizar sin analizar otra vez.
 ### 4 · `resumir` y `evaluar`
 
 Trabajan sobre lo que ya hay en la ficha, así que no vuelven a abrir el
-documento. **El resumen y los ejercicios los escribe un modelo de IA**: el
-texto del documento se le envía al modelo del centro y vuelve ya resumido, con
-apartados, negritas y tablas.
+documento. **El documento es solo la referencia del tema**: un modelo de IA lo
+usa para saber de qué va y **busca en internet la teoría** para escribir un
+**resumen de estudio de verdad** (qué es cada cosa, para qué sirve, un ejemplo y
+qué se pregunta en un examen) y un **examen que se puede aprobar estudiando ese
+resumen**. El resultado sale con apartados, negritas y tablas, y las fuentes
+consultadas van al final.
 
 El formato del fichero que se crea depende del sistema operativo:
 
@@ -166,33 +169,25 @@ TAREAS_IA_CA=~/.config/opencode/ca-simarro.crt
 El fichero `.env` se busca en la carpeta desde la que se lanza la orden y en
 `~/.config/tareas/.env`. Las variables de entorno del sistema tienen prioridad.
 
-#### Documentos escuetos: la IA busca en internet
+#### La IA investiga el tema en internet
 
-Un PDF de diapositivas puede tener 17 páginas y solo 400 caracteres de texto.
-En ese caso, un resumen del documento no sirve de nada: hay que **completar la
-información**.
+Un PDF de diapositivas puede tener 17 páginas y solo 400 caracteres de texto,
+pero es que **aunque el documento tenga texto, lo que importa es la teoría
+buena, no repetir el PDF**. Por eso `resumir` y `evaluar` no copian el
+documento: lo usan para identificar el tema y luego **investigan en internet**.
 
-Para eso, el modelo decide por su cuenta si necesita más datos. Si los
-necesita, escribe una línea con la forma `[[BUSCAR: consulta]]` y la
-herramienta busca esa información en internet (Wikipedia y DuckDuckGo, sin
-claves ni servicios de pago), se la devuelve al modelo y este termina el
-resumen. **Las fuentes consultadas se escriben al final del documento**, con su
-URL.
+Para eso, el modelo pide lo que necesita. Escribe una línea con la forma
+`[[BUSCAR: consulta]]` (una por concepto) y la herramienta busca esa información
+en internet —Wikipedia **y los resultados de la web** de DuckDuckGo en modo
+*lite*, sin claves ni servicios de pago—, se la devuelve con varias fuentes para
+que **elija la mejor**, y el modelo termina de escribir. Así tiene opciones más
+allá de la enciclopedia: documentación, blogs técnicos, apuntes. **Las fuentes
+consultadas se escriben al final del documento**, con su URL.
 
-El mismo mecanismo se usa en `evaluar`: si el modelo necesita una definición
-que no está en el documento, la busca.
-
-#### `evaluar` entiende de qué va el documento
-
-No todos los temas admiten el mismo tipo de ejercicio. Un tema de teoría
-(definiciones, conceptos, terminología) **no** lleva ejercicios de cálculo; uno
-de conversiones numéricas, sí. El modelo decide la mezcla y **explica al
-principio del documento qué ha decidido y por qué**, y omite los apartados que
-no tengan sentido.
-
-Además, si ya hiciste `tareas resumir` de ese documento, ese resumen (que
-puede llevar información completada con internet) se usa como contexto para
-preguntar: el resultado es mucho mejor.
+El mismo mecanismo se usa en `evaluar`: el examen se pregunta sobre la teoría
+investigada, no sobre lo que pone literalmente en el PDF. Si ya hiciste `tareas
+resumir` de ese tema, ese resumen (con la teoría buscada) se usa como base, de
+modo que **estudiar el resumen sirva para resolver el examen**.
 
 #### `formulario_evaluar`: el examen en el navegador (en pruebas)
 

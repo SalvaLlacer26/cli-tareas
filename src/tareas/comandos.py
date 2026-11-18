@@ -95,15 +95,13 @@ COMANDOS: list[FichaComando] = [
         nombre="resumir",
         uso="tareas resumir 'NOMBRE_DE_ARCHIVO' [CARPETA]",
         para_que=(
-            "Crea un documento con un resumen del contenido del archivo indicado, de "
-            "como máximo diez páginas, sin imágenes y con el texto organizado en "
-            "apartados y tablas. El resumen lo escribe un modelo de IA (el del "
-            "centro, con la clave en el .env). Si el documento llega demasiado "
-            "escueto, el propio modelo pide una búsqueda en internet y el resumen se "
-            "completa con esa información; las fuentes quedan escritas al final. Si "
-            "no hay modelo o no hay red, avisa y hace una versión extractiva. Se "
-            "guarda en la carpeta «resumenes» con el nombre del archivo seguido de "
-            "«_resumido»."
+            "Usa el archivo para identificar el tema y crea un resumen de estudio "
+            "con el texto organizado en apartados y tablas. Lo escribe un modelo de "
+            "IA (el del centro, con la clave en el .env) que INVESTIGA la teoría en "
+            "internet (Wikipedia y la web) en lugar de copiar el documento; las "
+            "fuentes quedan escritas al final. Si no hay modelo o no hay red, avisa "
+            "y hace una versión extractiva. Se guarda en la carpeta «resumenes» con "
+            "el nombre del archivo seguido de «_resumido»."
         ),
         ejemplo="tareas resumir 'A21_IntroduccióGit_GitHub.pdf'",
     ),
@@ -111,14 +109,15 @@ COMANDOS: list[FichaComando] = [
         nombre="evaluar",
         uso="tareas evaluar 'NOMBRE_DE_ARCHIVO' [CARPETA]",
         para_que=(
-            "Crea un documento con ejercicios sobre el archivo indicado, con sus "
-            "soluciones. La IA entiende primero de qué va el tema y decide la mezcla "
-            "de tipo test, desarrollo y cálculo: un tema puramente teórico no lleva "
-            "ejercicios de cálculo, y el documento explica al principio qué se ha "
-            "decidido. Si ya se hizo un resumen del archivo, se usa como contexto. "
-            "Si no hay modelo o no hay red, avisa y hace una versión extractiva. Se "
-            "guarda en la carpeta «ejercicios» con el nombre del archivo seguido de "
-            "«_test»."
+            "Crea un examen sobre el TEMA del archivo (mínimo 10 preguntas) con sus "
+            "soluciones. La IA investiga la teoría del tema en internet y pregunta "
+            "sobre ella, no sobre lo que pone en el PDF; decide la mezcla de tipo "
+            "test, desarrollo y cálculo (un tema teórico no lleva cálculo) y lo "
+            "explica al principio. Si ya se hizo `resumir` de ese tema, se apoya en "
+            "él, de forma que estudiar ese resumen sirva para aprobar. Cada pasada "
+            "sale distinta. Si no hay modelo o no hay red, avisa y hace una versión "
+            "extractiva. Se guarda en la carpeta «ejercicios» con el nombre del "
+            "archivo seguido de «_test»."
         ),
         ejemplo="tareas evaluar 'A21_IntroduccióGit_GitHub.pdf'",
     ),
