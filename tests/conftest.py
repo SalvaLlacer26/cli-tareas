@@ -61,13 +61,15 @@ def _sin_esperas_reales(monkeypatch):
 def _sin_internet(monkeypatch):
     """Ninguna prueba sale a internet.
 
-    `_pedir` es el único punto por el que `busqueda.py` abre una conexión.
-    Las pruebas que sí quieren probar la búsqueda sustituyen `_wikipedia` o
-    `_duckduckgo`, así que no se ven afectadas.
+    `_pedir` (JSON) y `_pedir_texto` (HTML) son los únicos puntos por los que
+    `busqueda.py` abre una conexión. Las pruebas que sí quieren probar la
+    búsqueda sustituyen `_wikipedia`, `_duckduckgo` o `_duckduckgo_web`, así
+    que no se ven afectadas.
     """
     import tareas.busqueda as busqueda
 
     monkeypatch.setattr(busqueda, "_pedir", lambda url: None)
+    monkeypatch.setattr(busqueda, "_pedir_texto", lambda url: None)
 
 
 @pytest.fixture

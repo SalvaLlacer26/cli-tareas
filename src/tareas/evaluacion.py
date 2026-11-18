@@ -248,18 +248,26 @@ def pedir_ejercicios(
         raise ErrorIA("el documento no tiene texto con el que preparar ejercicios")
 
     peticion = (
-        f"Prepara una batería de ejercicios sobre este documento de apuntes.\n\n"
+        f"Prepara un EXAMEN sobre el TEMA al que apuntan estos apuntes. **El "
+        f"documento NO es la fuente: es solo la referencia que dice de qué trata "
+        f"el tema.** El examen se hace sobre la teoría real del tema, no sobre "
+        f"detalles concretos del PDF.\n\n"
         f"{_variacion()}\n\n"
-        f"Primero entiende de qué va el documento: no todos los temas admiten el "
-        f"mismo tipo de ejercicio. Un tema de teoría (definiciones, conceptos, "
-        f"historia, terminología) NO debe llevar ejercicios de cálculo; un tema de "
-        f"cálculos (fórmulas, conversiones, números) sí, y quizá solo de eso. "
-        f"Decide la mezcla según el contenido y dilo en una línea al principio, "
-        f"con el motivo.\n\n"
+        f"1) INVESTIGA antes de preguntar. Un examen justo se contesta con la "
+        f"teoría del tema, no con lo que pone literalmente en el PDF. Para cada "
+        f"concepto que vayas a preguntar, pide su teoría en internet: escribe una "
+        f"línea con la forma [[BUSCAR: consulta]] por concepto y termina tu turno; "
+        f"te devolveré varias fuentes (enciclopedia y web) para que elijas las "
+        f"mejores. Puedes pedir varias búsquedas en el mismo turno.\n\n"
+        f"2) Primero entiende de qué va el tema: no todos admiten el mismo tipo de "
+        f"ejercicio. Un tema de teoría (definiciones, conceptos, historia, "
+        f"terminología) NO debe llevar ejercicios de cálculo; un tema de cálculos "
+        f"(fórmulas, conversiones, números) sí, y quizá solo de eso. Decide la "
+        f"mezcla según el tema y dilo en una línea al principio, con el motivo.\n\n"
         f"Reglas:\n"
         f"- Apartados con encabezados de segundo nivel (##): «Tipo test», "
         f"«Preguntas de desarrollo» y «Cálculo y problemas». Incluye solo los que "
-        f"tengan sentido para este documento y explica cuáles has dejado fuera.\n"
+        f"tengan sentido para este tema y explica cuáles has dejado fuera.\n"
         f"- En el tipo test, cada pregunta tiene CUATRO alternativas reales (no "
         f"líneas de puntos) y una sola correcta. NO escribas la respuesta "
         f"correcta junto a la pregunta ni detrás de las alternativas: las "
@@ -276,29 +284,29 @@ def pedir_ejercicios(
         f"y el enunciado completo.\n"
         f"- Al final, un apartado «## Soluciones» con la solución de cada pregunta "
         f"de tipo test y con las pautas de las de desarrollo.\n"
-        f"- Solo contenido del documento. No inventes datos.\n"
+        f"- Pregunta la TEORÍA del tema (la que has encontrado al investigar), de "
+        f"forma que un alumno que haya estudiado esa teoría pueda aprobar. No "
+        f"preguntes cosas que solo se saben por el PDF.\n"
         f"- Escribe en el idioma del documento.\n"
     )
 
     if contexto_extra:
         peticion += (
-            f"\nEste es un resumen más desarrollado del mismo documento (puede "
-            f"incluir información completada con internet). Úsalo como contexto "
-            f"para las preguntas, pero comprueba que sea coherente con el "
-            f"documento:\n\n"
-            f"--- RESUMEN DEL DOCUMENTO ---\n{contexto_extra}\n"
+            f"\nEste es el RESUMEN DE ESTUDIO del mismo tema (teoría investigada en "
+            f"internet). El examen debe poder responderse estudiándolo: alíñate con su "
+            f"contenido y usa los mismos conceptos y términos:\n\n"
+            f"--- RESUMEN DEL TEMA ---\n{contexto_extra}\n"
         )
 
     peticion += (
-        f"\nSi el documento es demasiado escueto o está muy sintetizado, o si te "
-        f"falta alguna definición para poder preguntar algo, escribe una línea con "
-        f"la forma [[BUSCAR: consulta]] y termina tu turno: se buscará esa "
-        f"información en internet y te la devolveré.\n\n"
-        f"--- DOCUMENTO ---\n{contenido}"
+        f"\nRecuerda: INVESTIGA primero con [[BUSCAR: consulta]] (una por concepto) "
+        f"y termina tu turno hasta tener la teoría; solo entonces escribe el "
+        f"examen.\n\n"
+        f"--- APUNTES (referencia del tema) ---\n{contenido}"
     )
 
     respuesta, fuentes = pedir_con_busqueda(
-        SISTEMA, peticion, temperatura=TEMPERATURA_EXAMEN
+        SISTEMA, peticion, temperatura=TEMPERATURA_EXAMEN, maximo_consultas=6
     )
     secciones = a_secciones(respuesta, titulo="Ejercicios")
     if not secciones or not any(s.lineas for s in secciones):

@@ -100,10 +100,16 @@ def pedir_bateria(ficha, contexto_extra: str = "") -> list[Pregunta]:
         raise ErrorIA("el documento no tiene texto con el que preparar ejercicios")
 
     peticion = (
-        "Prepara una batería de ejercicios sobre este documento de apuntes, "
-        "pensada para un formulario interactivo.\n\n"
+        "Prepara un EXAMEN sobre el TEMA al que apuntan estos apuntes, pensado "
+        "para un formulario interactivo. **El documento es solo la referencia del "
+        "tema: el examen se hace sobre la teoría real, no sobre lo que pone en el "
+        "PDF.**\n\n"
         f"{_variacion()}\n\n"
-        "Devuelve SOLO un array JSON con esta forma exacta:\n"
+        "INVESTIGA antes de preguntar: para cada concepto que vayas a preguntar, "
+        "pide su teoría en internet con una línea [[BUSCAR: consulta]] y termina tu "
+        "turno; te devolveré varias fuentes (enciclopedia y web) para que elijas. "
+        "Puedes pedir varias búsquedas en el mismo turno.\n\n"
+        "Cuando tengas la teoría, devuelve SOLO un array JSON con esta forma exacta:\n"
         '[\n'
         '  {"tipo": "test", "enunciado": "...", "opciones": ["...", "...", '
         '"...", "..."], "respuesta": "b"},\n'
@@ -115,22 +121,29 @@ def pedir_bateria(ficha, contexto_extra: str = "") -> list[Pregunta]:
         "Reglas:\n"
         f"- MÍNIMO {MINIMO_PREGUNTAS} preguntas en total: al menos 5 o 6 de tipo "
         f"test y el resto repartidas entre desarrollo y cálculo, según lo que dé "
-        f"el documento; un tema teórico no lleva cálculo.\n"
+        f"el tema; un tema teórico no lleva cálculo.\n"
         "- Las preguntas de tipo test llevan CUATRO alternativas plausibles "
         "y «respuesta» con la letra correcta (a, b, c o d).\n"
         "- Los enunciados se entienden solos, sin depender del documento.\n"
-        "- Solo contenido del documento; no inventes datos.\n"
+        "- Pregunta la TEORÍA del tema (la que has investigado), de forma que un "
+        "alumno que la haya estudiado pueda aprobar; no cosas que solo se saben "
+        "por el PDF.\n"
         "- Escribe en el idioma del documento.\n"
     )
     if contexto_extra:
         peticion += (
-            "\nResumen más desarrollado del mismo documento, como contexto:\n"
+            "\nRESUMEN DE ESTUDIO del mismo tema (teoría investigada): alíñate con "
+            "él, el examen debe poder responderse estudiándolo:\n"
             f"{contexto_extra[:8000]}\n"
         )
-    peticion += f"\n--- DOCUMENTO ---\n{contenido}"
+    peticion += (
+        f"\nRecuerda: primero INVESTIGA con [[BUSCAR: consulta]] y termina tu turno "
+        f"hasta tener la teoría; solo entonces devuelve el JSON.\n\n"
+        f"--- APUNTES (referencia del tema) ---\n{contenido}"
+    )
 
     respuesta, _fuentes = pedir_con_busqueda(
-        SISTEMA, peticion, temperatura=TEMPERATURA_EXAMEN
+        SISTEMA, peticion, temperatura=TEMPERATURA_EXAMEN, maximo_consultas=6
     )
     datos = _extraer_json(respuesta)
 
