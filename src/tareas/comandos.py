@@ -95,13 +95,16 @@ COMANDOS: list[FichaComando] = [
         nombre="resumir",
         uso="tareas resumir 'NOMBRE_DE_ARCHIVO' [CARPETA]",
         para_que=(
-            "Usa el archivo para identificar el tema y crea un resumen de estudio "
-            "con el texto organizado en apartados y tablas. Lo escribe un modelo de "
-            "IA (el del centro, con la clave en el .env) que INVESTIGA la teoría en "
-            "internet (Wikipedia y la web) en lugar de copiar el documento; las "
-            "fuentes quedan escritas al final. Si no hay modelo o no hay red, avisa "
-            "y hace una versión extractiva. Se guarda en la carpeta «resumenes» con "
-            "el nombre del archivo seguido de «_resumido»."
+            "Delimita de qué tema va el archivo y hasta dónde llega (ese es el "
+            "rango que hay que saberse) y escribe APUNTES COMPLETOS desde cero de "
+            "ese rango: no resume ni copia el documento, que solo sirve para "
+            "acotar el tema y para el encabezado. Los escribe un modelo de IA que "
+            "INVESTIGA la teoría en internet (Wikipedia y la web), con definiciones, "
+            "funcionamiento, ejemplos, tablas, «en el examen» y «preguntas típicas»; "
+            "las fuentes quedan al final. Si no hay modelo o no hay red, avisa y "
+            "guarda una extracción del documento con fuentes, avisando de que no "
+            "son los apuntes. Se guarda en «resumenes» con el nombre del archivo "
+            "seguido de «_resumido»."
         ),
         ejemplo="tareas resumir 'A21_IntroduccióGit_GitHub.pdf'",
     ),
@@ -114,10 +117,10 @@ COMANDOS: list[FichaComando] = [
             "sobre ella, no sobre lo que pone en el PDF; decide la mezcla de tipo "
             "test, desarrollo y cálculo (un tema teórico no lleva cálculo) y lo "
             "explica al principio. Si ya se hizo `resumir` de ese tema, se apoya en "
-            "él, de forma que estudiar ese resumen sirva para aprobar. Cada pasada "
-            "sale distinta. Si no hay modelo o no hay red, avisa y hace una versión "
-            "extractiva. Se guarda en la carpeta «ejercicios» con el nombre del "
-            "archivo seguido de «_test»."
+            "los apuntes generados, de forma que estudiarlos sirva para aprobar. "
+            "Cada pasada sale distinta. Si no hay modelo o no hay red, avisa y hace "
+            "una versión extractiva. Se guarda en la carpeta «ejercicios» con el "
+            "nombre del archivo seguido de «_test»."
         ),
         ejemplo="tareas evaluar 'A21_IntroduccióGit_GitHub.pdf'",
     ),
@@ -199,14 +202,14 @@ SIGUIENTES: dict[str, list[tuple[str, str]]] = {
         ("analizar", "con otros criterios"),
     ],
     "resumir": [
-        ("evaluar", "con el resumen de contexto"),
+        ("evaluar", "con los apuntes de contexto"),
         ("formulario_evaluar", "el examen en el navegador"),
     ],
     "evaluar": [
         ("formulario_evaluar", "el mismo examen, interactivo"),
     ],
     "formulario_evaluar": [
-        ("resumir", "y el documento en papel"),
+        ("resumir", "los apuntes para el papel"),
     ],
     "clasificar": [
         ("resumir", "de lo ya agrupado"),

@@ -6,6 +6,31 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.6.0] — 2026-11-23
+
+`resumir` se rehace desde cero: **ya no resume nada**. Analiza el documento solo
+para delimitar de qué tema va y **hasta dónde llega**, y con esa acotación
+escribe **apuntes completos desde cero** del rango, investigando la teoría en
+internet. El contenido del documento no se usa: solo aporta el encabezado, el
+pie y la acotación del tema.
+
+### Cambiado
+
+- **`resumir` = apuntes completos, no un resumen.** Dos fases: (1) `delimitar_tema`
+  mira principio y final del documento y saca un JSON con el tema, el nivel, lo
+  que cubre y lo que **no** llega a tratar; (2) `generar_apuntes` escribe unos
+  apuntes de manual de ese rango exacto, con definiciones, funcionamiento,
+  ejemplos, tablas, «en el examen», «ideas clave» y «preguntas típicas». Se
+  investigan las fuentes en internet (enciclopedia y web).
+- **El rango manda.** Los apuntes cubren exactamente lo que trata el documento y
+  **se detienen donde se detiene él** (si llega hasta los microprocesadores, no
+  desarrollan memoria ni gráfica: eso va al examen siguiente).
+- **Sin modelo, no finge apuntes.** Si falla la IA, guarda una extracción del
+  documento con fuentes buscadas y una nota que dice claro que *no* son los
+  apuntes. Antes hacía un resumen extractivo; ahora no hay resumen que valga.
+- `evaluar`/`formulario_evaluar` llaman «apuntes» al contexto que toma de
+  `resumir` (sigue leyendo `resumenes/…_resumido` por compatibilidad).
+
 ## [v2.5.0] — 2026-11-18
 
 `resumir` y `evaluar` dejan de copiar el PDF: el documento pasa a ser la

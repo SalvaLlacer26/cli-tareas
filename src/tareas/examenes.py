@@ -132,8 +132,9 @@ def pedir_bateria(ficha, contexto_extra: str = "") -> list[Pregunta]:
     )
     if contexto_extra:
         peticion += (
-            "\nRESUMEN DE ESTUDIO del mismo tema (teoría investigada): alíñate con "
-            "él, el examen debe poder responderse estudiándolo:\n"
+            "\nAPUNTES del mismo tema (los escribió antes la IA, investigando la "
+            "teoría): alíñate con ellos, el examen debe poder responderse "
+            "estudiándolos:\n"
             f"{contexto_extra[:8000]}\n"
         )
     peticion += (

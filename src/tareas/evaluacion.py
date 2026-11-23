@@ -201,11 +201,11 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
 
 
 def resumen_previo(carpeta: Path, nombre: str) -> str:
-    """El resumen que ya se hizo de este documento, si lo hay.
+    """Los apuntes que ya generó «resumir» para este documento, si los hay.
 
-    Si se ha ejecutado «tareas resumir» antes, ese resumen (que puede llevar
-    información completada con internet) es el mejor contexto para preparar
-    los ejercicios: está más developed que el documento original.
+    `resumir` escribe ahora apuntes completos desde cero (no un resumen) y los
+    guarda en «resumenes/…_resumido» por compatibilidad; ese texto, más rico
+    que el documento, es el mejor contexto para preparar el examen.
     """
     from .contenido import extraer
     from .nombres import separar_extension
@@ -292,10 +292,11 @@ def pedir_ejercicios(
 
     if contexto_extra:
         peticion += (
-            f"\nEste es el RESUMEN DE ESTUDIO del mismo tema (teoría investigada en "
-            f"internet). El examen debe poder responderse estudiándolo: alíñate con su "
-            f"contenido y usa los mismos conceptos y términos:\n\n"
-            f"--- RESUMEN DEL TEMA ---\n{contexto_extra}\n"
+            f"\nEstos son los APUNTES del mismo tema (los escribió antes la IA, "
+            f"investigando la teoría en internet). El examen debe poder responderse "
+            f"estudiándolos: alíñate con su contenido y usa los mismos conceptos y "
+            f"términos:\n\n"
+            f"--- APUNTES DEL TEMA ---\n{contexto_extra}\n"
         )
 
     peticion += (
@@ -346,11 +347,11 @@ def construir_secciones(
             secciones, fuentes = pedir_ejercicios(ficha, contexto_extra)
             nota = "Generado con inteligencia artificial."
             if contexto_extra:
-                nota += " Se ha usado el resumen ya hecho de este documento como contexto."
+                nota += " Se han usado los apuntes ya hechos de este tema como contexto."
             if fuentes:
                 nota += (
-                    f" El documento era demasiado escueto, así que se ha completado "
-                    f"con información de {len(fuentes)} fuente(s) de internet."
+                    f" La teoría se ha investigado en internet: "
+                    f"{len(fuentes)} fuente(s) citadas al final."
                 )
             return secciones, nota, fuentes
         except ErrorIA as exc:

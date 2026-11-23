@@ -50,10 +50,10 @@ MAXIMO_CARACTERES = 24000
 #: bastante con documentos largos, así que el margen es amplio.
 TIEMPO_ESPERA = 600
 
-#: Cuántos tokens se piden como máximo. Un resumen de estudio o un examen con
+#: Cuántos tokens se piden como máximo. Unos apuntes completos o un examen con
 #: teoría investigada necesitan espacio, pero un tope muy alto alenta
 #: generaciones larguísimas que atrancan a los servidores lentos. Con esto hay
-#: sitio para un resumen completo sin desbocarse.
+#: sitio para un texto completo sin desbocarse.
 TOKENS_MAXIMOS = 4000
 
 #: Una respuesta más corta que esto no sirve para nada. Sirve para detectar el

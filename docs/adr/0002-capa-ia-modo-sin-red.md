@@ -7,9 +7,10 @@
 ## Contexto
 
 A partir de la semana 3 la herramienta usa modelos de IA para tareas que un
-programa no hace bien solo: resumir un documento largo, preparar una batería de
-ejercicios, agrupar ficheros por lo que dice su contenido (`clasificar`) y
-proponer los ejercicios del formulario interactivo (`formulario_evaluar`).
+programa no hace bien solo: escribir apuntes completos del tema que acota un
+documento (`resumir`), preparar una batería de ejercicios, agrupar ficheros por
+lo que dice su contenido (`clasificar`) y proponer los ejercicios del formulario
+interactivo (`formulario_evaluar`).
 
 Eso plantea tres problemas que no puede resolver cada comando por su cuenta:
 
@@ -38,10 +39,11 @@ primer commit. En el repo solo hay un `.env.example` documentado, sin valores.
 **Modo sin red obligatorio.** Cualquier problema al hablar con el modelo
 (sin clave, sin red, error del servidor, respuesta sin sentido) se convierte en
 un `ErrorIA` con un mensaje de **una línea**. La CLI lo captura y **sigue
-ofreciendo la versión sin IA** de la orden: `resumir` y `evaluar` caen a una
-versión extractiva que saca apartados y definiciones del propio texto, y
-`clasificar` pone todo en «Por clasificar». Ninguna orden revienta por no haber
-modelo; lo dice y hace lo que puede.
+ofreciendo la versión sin IA** de la orden: `resumir` guarda una extracción del
+documento con fuentes buscadas y una nota que avisa de que **no son los apuntes**
+(sin modelo no se pueden escribir apuntes desde cero), `evaluar` cae a una versión
+extractiva, y `clasificar` pone todo en «Por clasificar». Ninguna orden revienta
+por no haber modelo; lo dice y hace lo que puede.
 
 ## Alternativas consideradas
 
