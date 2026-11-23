@@ -6,6 +6,14 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+### Cambiado
+
+- **Proceso y documentación al día (criterio de release).** Añadida `docs/spec.md`
+  (la especificación de 10 líneas que abre el ciclo), el README enlaza ya spec,
+  ADRs, releases etiquetadas y el flujo por ramas (`merge --no-ff`), y se corrige
+  el recuento de pruebas del árbol. El trabajo por ramas queda reflejado en el
+  grafo de `git log`.
+
 ## [v2.6.0] — 2026-11-23
 
 `resumir` se rehace desde cero: **ya no resume nada**. Analiza el documento solo
