@@ -72,9 +72,12 @@ COMANDOS: list[FichaComando] = [
             "Crea un documento con un resumen del contenido del archivo indicado, de "
             "como máximo diez páginas, sin imágenes y con el texto organizado en "
             "apartados y tablas. El resumen lo escribe un modelo de IA (el del "
-            "centro, con la clave en el .env); si no hay modelo o no hay red, avisa y "
-            "hace una versión extractiva. Se guarda en la carpeta «resumenes» con el "
-            "nombre del archivo seguido de «_resumido»."
+            "centro, con la clave en el .env). Si el documento llega demasiado "
+            "escueto, el propio modelo pide una búsqueda en internet y el resumen se "
+            "completa con esa información; las fuentes quedan escritas al final. Si "
+            "no hay modelo o no hay red, avisa y hace una versión extractiva. Se "
+            "guarda en la carpeta «resumenes» con el nombre del archivo seguido de "
+            "«_resumido»."
         ),
         ejemplo="tareas resumir 'A21_IntroduccióGit_GitHub.pdf'",
     ),
@@ -82,12 +85,14 @@ COMANDOS: list[FichaComando] = [
         nombre="evaluar",
         uso="tareas evaluar 'NOMBRE_DE_ARCHIVO' [CARPETA]",
         para_que=(
-            "Crea un documento con ejercicios sobre el archivo indicado: preguntas tipo "
-            "test con alternativas reales, preguntas de desarrollo y problemas de "
-            "cálculo, con sus soluciones. Los prepara un modelo de IA (el del centro, "
-            "con la clave en el .env); si no hay modelo o no hay red, avisa y hace una "
-            "versión extractiva. Se guarda en la carpeta «ejercicios» con el nombre "
-            "del archivo seguido de «_test»."
+            "Crea un documento con ejercicios sobre el archivo indicado, con sus "
+            "soluciones. La IA entiende primero de qué va el tema y decide la mezcla "
+            "de tipo test, desarrollo y cálculo: un tema puramente teórico no lleva "
+            "ejercicios de cálculo, y el documento explica al principio qué se ha "
+            "decidido. Si ya se hizo un resumen del archivo, se usa como contexto. "
+            "Si no hay modelo o no hay red, avisa y hace una versión extractiva. Se "
+            "guarda en la carpeta «ejercicios» con el nombre del archivo seguido de "
+            "«_test»."
         ),
         ejemplo="tareas evaluar 'A21_IntroduccióGit_GitHub.pdf'",
     ),
@@ -110,6 +115,20 @@ COMANDOS: list[FichaComando] = [
             "sin tocar nada; con --si no pregunta antes de una acción destructiva."
         ),
         ejemplo="tareas ejecutar separar-instaladores ~/Descargas --simular",
+    ),
+    FichaComando(
+        nombre="clasificar",
+        uso="tareas clasificar [CARPETA] --destino RUTA",
+        para_que=(
+            "Crea en la ruta indicada un grupo de carpetas nuevas, decididas por la "
+            "IA según el contenido de los documentos analizados, y mueve dentro cada "
+            "documento. Un PDF de recetas acabaría en una carpeta «Recetas» y un "
+            "manual de hardware en otra «Hardware». A diferencia de «organizar», que "
+            "usa las asignaturas de la configuración, aquí las carpetas las crea la "
+            "IA. Necesita un modelo configurado y pide confirmación antes de mover "
+            "nada."
+        ),
+        ejemplo="tareas clasificar --destino ~/Documents/MisTemas",
     ),
     FichaComando(
         nombre="comandos",

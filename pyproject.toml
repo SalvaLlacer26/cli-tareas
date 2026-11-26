@@ -1,6 +1,6 @@
 [project]
 name = "tareas"
-version = "2.1.0"
+version = "2.2.0"
 description = "Automatiza tareas repetitivas con ficheros desde la terminal"
 readme = "README.md"
 authors = [
