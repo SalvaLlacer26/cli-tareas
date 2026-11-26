@@ -6,6 +6,37 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.5.0] — 2026-11-18
+
+`resumir` y `evaluar` dejan de copiar el PDF: el documento pasa a ser la
+referencia del tema y la IA **investiga la teoría en internet** (no solo
+Wikipedia) para escribir un resumen de estudio de verdad y un examen que se
+puede aprobar estudiándolo.
+
+### Cambiado
+
+- **El documento es una referencia, no la fuente.** `resumir` y `evaluar` ya no
+  resumen/copian el PDF: lo usan solo para saber de qué va el tema y luego
+  buscan la teoría en internet. El prompt pide investigar antes de escribir.
+- **Resúmenes de estudio útiles.** El resumen explica cada tema (qué es, para
+  qué sirve, cómo funciona, un ejemplo y qué se pregunta en un examen) en lugar
+  de un vago «esta sección habla de la RAM». Se quita el tope de «10 páginas».
+- **El examen es coherente con el resumen.** `evaluar` se apoya en la teoría
+  investigada y, si existe, en el resumen generado, de forma que estudiar ese
+  resumen permita resolver el test.
+- **Más margen de salida** (`max_tokens` de 3000 a 4000) para resúmenes y
+  exámenes completos.
+
+### Añadido
+
+- **Fuentes de la web, además de Wikipedia.** `buscar` consulta también los
+  resultados de DuckDuckGo en modo *lite* (documentación, blogs técnicos,
+  apuntes…), descarta publicidad y reserva sitio para al menos una fuente web.
+  Así la IA tiene de dónde elegir la mejor fuente, no solo la enciclopedia.
+- **Más búsquedas por encargo** (hasta 6 rondas) para que la investigación dé
+  de sí en resúmenes y exámenes.
+- Pruebas del analizador de la web y de los nuevos prompts de investigación.
+
 ## [v2.4.0] — 2026-11-13
 
 `deshacer` también revierte `clasificar`, los exámenes salen con al menos 10

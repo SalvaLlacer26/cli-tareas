@@ -136,10 +136,13 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
 
 
 def pedir_resumen(ficha: Ficha) -> tuple[list[Seccion], list[Fuente]]:
-    """Le pide al modelo un resumen y lo convierte en secciones.
+    """Le pide al modelo un resumen-investigación y lo convierte en secciones.
 
-    Si el documento es demasiado escueto, el modelo pide una búsqueda con
-    ``[[BUSCAR: consulta]]`` y la herramienta se la devuelve ya hecha.
+    El documento NO es la fuente: es la referencia que dice DE QUÉ trata el
+    tema. El modelo debe buscar en internet la teoría (Wikipedia y web) y
+    escribir una síntesis de estudio completa, de la que uno pueda servirse
+    para aprobar un examen. Si el documento es escueto, con más razón: el
+    contenido sale de la investigación, no del PDF.
     """
     from .ia import pedir_con_busqueda
 
@@ -148,26 +151,39 @@ def pedir_resumen(ficha: Ficha) -> tuple[list[Seccion], list[Fuente]]:
         raise ErrorIA("el documento no tiene texto que resumir")
 
     peticion = (
-        f"Resume este documento de apuntes.\n\n"
-        f"Reglas:\n"
-        f"- Un resumen de máximo 10 páginas, sin imágenes.\n"
-        f"- Empieza con un apartado «Ideas principales» con entre 5 y 10 puntos "
-        f"con los conceptos que de verdad hay que saberse.\n"
-        f"- Después, un apartado por cada tema del documento, con el contenido "
-        f"esencial y, si ayuda, una tabla.\n"
-        f"- Usa encabezados de segundo nivel (##) para los apartados.\n"
-        f"- No inventes nada: solo lo que esté en el texto.\n"
+        f"El siguiente documento son unos apuntes. **No resumas el documento: "
+        f"sirve solo para identificar el TEMA.** Tu trabajo es escribir, de ese "
+        f"tema, un RESUMEN DE ESTUDIO completo y autosuficiente, a partir de la "
+        f"teoría que encuentres en internet, que permita a un estudiante de 1º de "
+        f"DAM aprobar un examen solo leyendo esto.\n\n"
+        f"1) INVESTIGA antes de escribir. El documento es el índice del tema, no "
+        f"su contenido. Para cada concepto importante que aparezca (o se "
+        f"mencione de pasada), pide su teoría en internet. Escribe una línea con "
+        f"la forma [[BUSCAR: consulta]] por cada concepto y termina tu turno; te "
+        f"devolveré varias fuentes (enciclopedia y web) para que elijas las "
+        f"mejores. Puedes pedir varias búsquedas en el mismo turno. Busca "
+        f"aunque el documento ya tenga texto: lo que importa es la teoría buena, "
+        f"no repetir el PDF.\n\n"
+        f"2) ESCRIBE la síntesis. Reglas:\n"
+        f"- Empieza con un apartado «Ideas principales» con los 6-10 conceptos "
+        f"que hay que saberse de memoria.\n"
+        f"- Después, un apartado (encabezado ##) por cada tema o bloque del "
+        f"documento.\n"
+        f"- En cada apartado EXPLICA el tema de verdad: qué es, para qué sirve, "
+        f"cómo funciona, un ejemplo, y qué se suele preguntar en un examen. "
+        f"Nada de «esta sección habla de la RAM»: di QUÉ es la RAM, cómo va y "
+        f"por qué importa.\n"
+        f"- Usa tablas y listas cuando ayuden a estudiar.\n"
+        f"- Apóyate en la información encontrada en internet; combínala con los "
+        f"apuntes. No te inventes datos, pero tampoco te limites a lo poquito "
+        f"que diga el PDF.\n"
+        f"- Que sea claro y sin relleno, pero COMPLETO: mejor largo y útil que "
+        f"corto y vacío. No lo recortes por ahorrar.\n"
         f"- Escribe en el idioma del documento.\n\n"
-        f"Si el documento es demasiado escueto o está muy sintetizado (por ejemplo, "
-        f"solo tiene un índice y títulos, o es un PDF de diapositivas con muy poco "
-        f"texto), te falta información para hacer un buen resumen. En ese caso, "
-        f"escribe una línea con la forma [[BUSCAR: consulta]] y termina tu turno: "
-        f"se buscará esa información en internet y te la devolveré para que la uses. "
-        f"Pide una búsqueda por concepto, no por el documento entero.\n\n"
-        f"--- DOCUMENTO ---\n{contenido}"
+        f"--- APUNTES (referencia del tema) ---\n{contenido}"
     )
 
-    respuesta, fuentes = pedir_con_busqueda(SISTEMA, peticion)
+    respuesta, fuentes = pedir_con_busqueda(SISTEMA, peticion, maximo_consultas=6)
     secciones = a_secciones(respuesta, titulo="Ideas principales")
     if not secciones or not any(s.lineas for s in secciones):
         raise ErrorIA("el modelo ha contestado pero sin contenido")
@@ -220,9 +236,12 @@ def construir_secciones(
             nota = "Generado con inteligencia artificial."
             if fuentes:
                 nota += (
-                    f" El documento era demasiado escueto, así que se ha completado "
-                    f"con información de {len(fuentes)} fuente(s) de internet."
+                    f" La teoría se ha ampliado e investigado en internet: se han "
+                    f"usado {len(fuentes)} fuente(s) (enciclopedia y web), citadas "
+                    f"al final."
                 )
+            else:
+                nota += " No se ha encontrado información adicional en internet."
             return secciones, nota, fuentes
         except ErrorIA as exc:
             nota = f"Generado sin inteligencia artificial: {exc}."

@@ -49,6 +49,88 @@ def test_buscar_no_devuelve_la_misma_fuente_dos_veces(monkeypatch) -> None:
     assert len(buscar("algo")) == 1
 
 
+def test_la_web_entra_como_fuente_aunque_la_wikipedia_no_de_nada(monkeypatch) -> None:
+    """Si la enciclopedia falla, la búsqueda sigue dando fuentes de la web."""
+    import tareas.busqueda as busqueda
+
+    web = Fuente(
+        titulo="Documentación de la RAM",
+        url="https://docs.example.org/ram",
+        fragmento="La RAM es una memoria volátil de acceso aleatorio...",
+        origen="web",
+    )
+    monkeypatch.setattr(busqueda, "_wikipedia", lambda idioma, consulta, limite: [])
+    monkeypatch.setattr(busqueda, "_duckduckgo", lambda consulta: [])
+    monkeypatch.setattr(busqueda, "_duckduckgo_web", lambda consulta, limite: [web])
+
+    assert buscar("memoria ram") == [web]
+
+
+def test_la_busqueda_mantiene_al_menos_una_fuente_web(monkeypatch) -> None:
+    """Aunque Wikipedia llene el hueco, se reserva sitio para una fuente web."""
+    import tareas.busqueda as busqueda
+
+    wiki = [
+        Fuente(f"W{i}", f"https://es.wikipedia.org/wiki/W{i}", "x" * 300, "wikipedia-es")
+        for i in range(4)
+    ]
+    web = Fuente("Web", "https://ejemplo.org/guia", "y" * 300, "web")
+    monkeypatch.setattr(busqueda, "_wikipedia", lambda idioma, consulta, limite: list(wiki))
+    monkeypatch.setattr(busqueda, "_duckduckgo", lambda consulta: [])
+    monkeypatch.setattr(busqueda, "_duckduckgo_web", lambda consulta, limite: [web])
+
+    resultado = buscar("memoria", limite=3)
+    assert any(f.origen == "web" for f in resultado)
+
+
+def test_la_web_extrae_titulo_url_y_fragmento(monkeypatch) -> None:
+    """Se leen los resultados de DuckDuckGo lite, decodificando su redirección.
+
+    Incluye un resultado patrocinado (publicidad) que debe quedar fuera.
+    """
+    import tareas.busqueda as busqueda
+
+    pagina = """
+      <table>
+        <tr class="result-sponsored"><td><a rel="nofollow"
+          href="//duckduckgo.com/l/?uddg=https%3A%2F%2Ftienda.example%2Fram&amp;rut=zz"
+          class='result-link'>Módulos de RAM baratos - Tienda</a> (Sponsored link -
+          <a href="https://duckduckgo.com/help" rel="nofollow" class="result-link">more info</a>)
+        </td></tr>
+        <tr><td class='result-snippet'>Compra RAM barato aquí, ofertas.</td></tr>
+        <tr><td><a rel="nofollow"
+          href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.xataka.com%2Fbasics%2Fmemoria-ram&amp;rut=aa"
+          class='result-link'>Memoria RAM: qué es y para qué sirve - Xataka</a></td></tr>
+        <tr><td class='result-snippet'>Te explicamos qué es la <b>memoria RAM</b>, para
+          qué sirve en tu ordenador y cómo saber cuánta tienes instalada.</td></tr>
+        <tr><td><a rel="nofollow"
+          href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fconcepto.de%2Fmemoria-ram%2F&amp;rut=bb"
+          class='result-link'>Memoria RAM - concepto.de</a></td></tr>
+        <tr><td class='result-snippet'>La memoria RAM es la memoria principal de un
+          ordenador: es volátil y permite el acceso aleatorio a los datos guardados.</td></tr>
+      </table>
+    """
+    monkeypatch.setattr(busqueda, "_pedir_texto", lambda url: pagina)
+
+    fuentes = busqueda._duckduckgo_web("memoria ram", limite=5)
+    # El patrocinado (tienda.example) y el enlace de ayuda no entran.
+    assert [f.url for f in fuentes] == [
+        "https://www.xataka.com/basics/memoria-ram",
+        "https://concepto.de/memoria-ram/",
+    ]
+    assert fuentes[0].titulo == "Memoria RAM: qué es y para qué sirve - Xataka"
+    assert fuentes[0].origen == "web"
+    assert "memoria RAM" in fuentes[0].fragmento
+
+
+def test_la_web_sin_pagina_no_rompe(monkeypatch) -> None:
+    """Si el buscador no responde o cambia, la búsqueda web no revienta."""
+    import tareas.busqueda as busqueda
+
+    monkeypatch.setattr(busqueda, "_pedir_texto", lambda url: None)
+    assert busqueda._duckduckgo_web("cualquier cosa", limite=5) == []
+
+
 def test_sin_red_la_busqueda_devuelve_una_lista_vacia(monkeypatch) -> None:
     """Si no hay red, no se rompe: simplemente no hay resultados."""
     import urllib.request

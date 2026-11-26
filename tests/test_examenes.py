@@ -127,6 +127,41 @@ def test_pedir_bateria_filtra_las_preguntas_mal_formadas(monkeypatch) -> None:
     assert len(preguntas) >= 10  # y aun así se llega al mínimo de 10
 
 
+def test_el_prompt_del_formulario_investiga_y_no_copia_el_pdf(monkeypatch) -> None:
+    """El formulario_evaluar se hace sobre la teoría investigada, no el PDF."""
+    import tareas.ia as ia
+    from tareas.ficha import Ficha
+
+    capturado: dict[str, str] = {}
+
+    def falsa_peticion(sistema, peticion, *a, **k):
+        capturado["peticion"] = peticion
+        return (
+            json.dumps(
+                [
+                    {
+                        "tipo": "test",
+                        "enunciado": f"Test {n}",
+                        "opciones": ["a", "b", "c", "d"],
+                        "respuesta": "a",
+                    }
+                    for n in range(1, 12)
+                ]
+            ),
+            [],
+        )
+
+    monkeypatch.setattr(ia, "pedir_con_busqueda", falsa_peticion)
+
+    examenes.pedir_bateria(Ficha(nombre_original="d.txt", contenido="texto largo " * 20))
+
+    peticion = capturado["peticion"]
+    assert "INVESTIGA" in peticion
+    assert "referencia del tema" in peticion
+    assert "[[BUSCAR: consulta]]" in peticion
+    assert "Solo contenido del documento" not in peticion
+
+
 # ----------------------------------------------------------- el servidor local
 
 

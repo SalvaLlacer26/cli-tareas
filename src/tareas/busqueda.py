@@ -1,12 +1,13 @@
 """Buscar en internet sin claves ni servicios de pago.
 
-Se usa sobre todo la **API de Wikipedia**, que es abierta, sin clave, y da
-texto plano de artículos con su URL: justo lo que hace falta para «completar»
-un documento que viene esquemático. Como complemento se consulta el
-«Instant Answer» de DuckDuckGo, que tampoco necesita clave.
+Se combinan varias fuentes para que quien resume o prepara un examen pueda
+elegir la mejor, no solo la enciclopedia: la **API de Wikipedia** (abierta, sin
+clave, texto plano con su URL) y los **resultados de la web** de DuckDuckGo en
+modo *lite* (documentación, blogs técnicos, apuntes…). El «Instant Answer» de
+DuckDuckGo queda como complemento.
 
-Si no hay red, o el servicio contesta con un error, la búsqueda devuelve una
-lista vacía y quien llama sigue con lo que tenía. **Nunca revienta.**
+Si no hay red, o un servicio responde con un error o cambia de formato, esa
+fuente devuelve una lista vacía y se sigue con las demás. **Nunca revienta.**
 """
 
 from __future__ import annotations
@@ -28,8 +29,16 @@ MAXIMO_FRAGMENTO = 2000
 #: Un artículo más corto que esto se considera un stub y se descarta.
 MINIMO_FRAGMENTO = 250
 
+#: Un fragmento de la web es más corto que un artículo: con menos de esto no
+#: sirve para estudiar.
+MINIMO_WEB = 80
+
 #: Idiomas en los que se busca, por orden.
 IDIOMAS = ("es", "en")
+
+#: El navegador que se finge al pedir páginas: algunos servidores bloquean a
+#: quien no se identifica.
+USER_AGENT = "tareas-cli/1.0 (organizador de apuntes; uso educativo)"
 
 
 @dataclass
@@ -51,6 +60,9 @@ REINTENTOS = 3
 #: Caché de peticiones: no se repite la misma dos veces.
 _CACHE: dict[str, dict | None] = {}
 
+#: Caché de las peticiones que devuelven HTML (la web), no JSON.
+_CACHE_TEXTO: dict[str, str | None] = {}
+
 
 def _pedir(url: str) -> dict | None:
     """Pide una URL y devuelve el JSON, o None si algo falla.
@@ -68,7 +80,7 @@ def _pedir(url: str) -> dict | None:
         peticion = urllib.request.Request(
             url,
             headers={
-                "User-Agent": "tareas-cli/1.0 (organizador de apuntes; uso educativo)",
+                "User-Agent": USER_AGENT,
                 "Accept": "application/json",
             },
         )
@@ -90,6 +102,41 @@ def _pedir(url: str) -> dict | None:
 
     _CACHE[url] = datos
     return datos
+
+
+def _pedir_texto(url: str) -> str | None:
+    """Pide una URL que devuelve HTML y devuelve el texto, o None si falla.
+
+    Es lo mismo que `_pedir` pero sin interpretar JSON: sirve para los
+    buscadores de la web. Como todo aquí, si no hay red o el servidor
+    responde mal, devuelve None y quien llama sigue sin resultados.
+    """
+    if url in _CACHE_TEXTO:
+        return _CACHE_TEXTO[url]
+
+    texto: str | None = None
+    for intento in range(REINTENTOS):
+        if intento:
+            time.sleep(PAUSA * intento)
+        peticion = urllib.request.Request(
+            url,
+            headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
+        )
+        try:
+            with urllib.request.urlopen(peticion, timeout=TIEMPO_ESPERA) as respuesta:
+                texto = respuesta.read().decode("utf-8", errors="ignore")
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 429, 500, 502, 503) and intento < REINTENTOS - 1:
+                continue
+            texto = None
+            break
+        except (urllib.error.URLError, TimeoutError, OSError):
+            texto = None
+            break
+
+    _CACHE_TEXTO[url] = texto
+    return texto
 
 
 def _wikipedia(idioma: str, consulta: str, limite: int) -> list[Fuente]:
@@ -176,7 +223,7 @@ def _duckduckgo(consulta: str) -> list[Fuente]:
 
     fuentes: list[Fuente] = []
     resumen = (datos.get("AbstractText") or "").strip()
-    if len(resumen) >= MINIMO_FRAGMENTO:
+    if len(resumen) >= MINIMO_WEB:
         fuentes.append(
             Fuente(
                 titulo=datos.get("Heading") or consulta,
@@ -185,6 +232,103 @@ def _duckduckgo(consulta: str) -> list[Fuente]:
                 origen="duckduckgo",
             )
         )
+    return fuentes
+
+
+#: Los enlaces de resultado de DuckDuckGo vienen envueltos en una redirección
+#: suya («/l/?uddg=<url escapada>»). De aquí se saca la URL de verdad.
+RE_UDDG = re.compile(r"[?&]uddg=([^&]+)")
+
+
+def _quitar_tags(texto: str) -> str:
+    """Queda el texto sin etiquetas HTML y con las entidades decodificadas."""
+    import html
+
+    limpio = re.sub(r"<[^>]+>", " ", texto)
+    limpio = html.unescape(limpio)
+    return " ".join(limpio.split()).strip()
+
+
+def _url_del_enlace(href: str) -> str:
+    """La URL real de un enlace de resultado, desmontando la redirección."""
+    import html
+
+    href = html.unescape(href)
+    encontrada = RE_UDDG.search(href)
+    if encontrada:
+        href = urllib.parse.unquote(encontrada.group(1))
+    return href.strip()
+
+
+def _es_fuente_valida(url: str) -> bool:
+    """Si una URL sirve como fuente (no es basura del propio buscador)."""
+    if not url.startswith(("http://", "https://")):
+        return False
+    dominio = urllib.parse.urlparse(url).netloc.lower()
+    # Se descartan las páginas internas del propio buscador.
+    return "duckduckgo.com" not in dominio
+
+
+def _duckduckgo_web(consulta: str, limite: int) -> list[Fuente]:
+    """Resultados de la web (no solo Wikipedia) con DuckDuckGo en modo «lite».
+
+    La versión «lite» del buscador devuelve HTML sencillo, sin JavaScript y sin
+    el bloqueo anti-bots que tiene la versión normal, y además da variedad de
+    fuentes (documentación, blogs técnicos, apuntes, periódicos) más allá de la
+    enciclopedia. Se leen los enlaces de resultado (con su URL real, que viene
+    envuelta en una redirección del buscador) y su extracto.
+
+    Es un análisis de HTML por patrones: si el buscador cambia de marcado, no
+    se encuentra nada y la búsqueda se queda solo con Wikipedia. Nunca revienta.
+    """
+    url = "https://lite.duckduckgo.com/lite/?" + urllib.parse.urlencode({"q": consulta})
+    pagina = _pedir_texto(url)
+    if not pagina:
+        return []
+
+    # Cada enlace de resultado: URL (redirigida) + título.
+    enlaces = list(
+        re.finditer(
+            r"<a\b[^>]*?href=\"([^\"]+)\"[^>]*?class=['\"]result-link['\"][^>]*>(.*?)</a>",
+            pagina,
+            re.S,
+        )
+    )
+
+    fuentes: list[Fuente] = []
+    vistas: set[str] = set()
+    for numero, m in enumerate(enlaces):
+        real = _url_del_enlace(m.group(1))
+        if not _es_fuente_valida(real) or real in vistas:
+            continue
+
+        # El trozo hasta el siguiente enlace delata si es un resultado
+        # patrocinado (publicidad) y trae el extracto del resultado.
+        inicio = m.end()
+        fin = enlaces[numero + 1].start() if numero + 1 < len(enlaces) else len(pagina)
+        trozo = pagina[inicio:fin]
+        if "Sponsored" in trozo or "result-sponsored" in trozo:
+            continue
+
+        titulo = _quitar_tags(m.group(2))
+        snippet = re.search(
+            r"class=['\"]result-snippet['\"][^>]*>(.*?)</td>", trozo, re.S
+        )
+        fragmento = _quitar_tags(snippet.group(1)) if snippet else ""
+        if not titulo or len(fragmento) < MINIMO_WEB:
+            continue
+
+        vistas.add(real)
+        fuentes.append(
+            Fuente(
+                titulo=titulo,
+                url=real,
+                fragmento=fragmento[:MAXIMO_FRAGMENTO],
+                origen="web",
+            )
+        )
+        if len(fuentes) >= limite:
+            break
     return fuentes
 
 
@@ -252,13 +396,16 @@ def _encaja_bien(fuentes: list[Fuente], consulta: str) -> bool:
     return False
 
 
-def buscar(consulta: str, limite: int = 3) -> list[Fuente]:
+def buscar(consulta: str, limite: int = 5) -> list[Fuente]:
     """Busca información en internet.
 
     Si la consulta es demasiado larga y no encuentra nada, se prueba con
     versiones más cortas: un modelo suele pedir «Introducción a las bases de
     datos conceptos ficheros SGBD Alejandro Hernández Doménech», y con eso no
     encuentra ni Wikipedia.
+
+    Consulta varias fuentes a la vez (Wikipedia y la web general) para que
+    quien resume pueda elegir la mejor, no solo la enciclopedia.
 
     Devuelve una lista de fuentes (puede estar vacía). Nunca lanza: si no hay
     red, simplemente no hay resultados.
@@ -334,7 +481,14 @@ def _ordenar(fuentes: list[Fuente], consulta: str) -> list[Fuente]:
 
 
 def _buscar_version(consulta: str, limite: int) -> list[Fuente]:
-    """Busca con una consulta concreta, sin acortarla."""
+    """Busca con una consulta concreta, mezclando enciclopedia y web.
+
+    Se recogen a la vez Wikipedia (en varios idiomas), el dato rápido de
+    DuckDuckGo y los resultados de la web. Así quien resume tiene de dónde
+    elegir, no solo el artículo enciclopédico. Después se ordenan por
+    relevancia y se recortan a `limite`, dejando hueco para que entre al menos
+    una fuente web si la hay.
+    """
     consulta = consulta.strip()
     if not consulta:
         return []
@@ -342,23 +496,29 @@ def _buscar_version(consulta: str, limite: int) -> list[Fuente]:
     fuentes: list[Fuente] = []
     vistas: set[str] = set()
 
+    def ir_anadiendo(nuevas: list[Fuente]) -> None:
+        for fuente in nuevas:
+            if fuente.url in vistas:
+                continue
+            vistas.add(fuente.url)
+            fuentes.append(fuente)
+
     for idioma in IDIOMAS:
-        for fuente in _wikipedia(idioma, consulta, limite):
-            if fuente.url in vistas:
-                continue
-            vistas.add(fuente.url)
-            fuentes.append(fuente)
-        if len(fuentes) >= limite:
-            break
+        ir_anadiendo(_wikipedia(idioma, consulta, limite))
 
-    if len(fuentes) < limite:
-        for fuente in _duckduckgo(consulta):
-            if fuente.url in vistas:
-                continue
-            vistas.add(fuente.url)
-            fuentes.append(fuente)
+    ir_anadiendo(_duckduckgo(consulta))
+    web = _duckduckgo_web(consulta, limite)
+    ir_anadiendo(web)
 
-    return _ordenar(fuentes, consulta)[:limite]
+    ordenadas = _ordenar(fuentes, consulta)
+    # Si la ordenación deja fuera toda la web, se mete al menos una: la idea es
+    # dar opciones distintas de la Wikipedia, no quedarnos solo con ella.
+    cortadas = ordenadas[:limite]
+    if web and not any(f.origen == "web" for f in cortadas) and cortadas:
+        mejor_web = next((f for f in ordenadas if f.origen == "web"), None)
+        if mejor_web is not None:
+            cortadas = cortadas[:-1] + [mejor_web]
+    return cortadas
 
 
 def como_texto(fuentes: list[Fuente]) -> str:

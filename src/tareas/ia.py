@@ -50,8 +50,11 @@ MAXIMO_CARACTERES = 24000
 #: bastante con documentos largos, así que el margen es amplio.
 TIEMPO_ESPERA = 600
 
-#: Cuántos tokens se piden como máximo.
-TOKENS_MAXIMOS = 3000
+#: Cuántos tokens se piden como máximo. Un resumen de estudio o un examen con
+#: teoría investigada necesitan espacio, pero un tope muy alto alenta
+#: generaciones larguísimas que atrancan a los servidores lentos. Con esto hay
+#: sitio para un resumen completo sin desbocarse.
+TOKENS_MAXIMOS = 4000
 
 #: Una respuesta más corta que esto no sirve para nada. Sirve para detectar el
 #: caso en que el modelo solo devuelve su petición de búsqueda.
@@ -360,9 +363,9 @@ def pedir_con_busqueda(
                     "role": "user",
                     "content": (
                         "No he encontrado nada con esa búsqueda. Escribe YA la "
-                        "respuesta final, sin buscar nada más, usando solo el "
-                        "documento. Si el documento es escueto, resume lo que haya y "
-                        "no inventes."
+                        "respuesta final, sin buscar nada más. Apóyate en el "
+                        "documento y en lo que sepas del tema para explicarlo bien, "
+                        "pero no inventes datos falsos."
                     ),
                 }
             )
