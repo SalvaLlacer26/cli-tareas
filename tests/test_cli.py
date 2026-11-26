@@ -333,7 +333,7 @@ def test_ejecutar_una_accion_que_no_existe_da_codigo_1(tmp_path: Path) -> None:
 
 
 def test_resumir_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -> None:
-    """Sin IA no se rompe: se explica y se hace el resumen extractivo."""
+    """Sin IA no se rompe: se explica, se dan los pasos y se hace la versión extractiva."""
     ruta = escribir_config(tmp_path)
     documento(tmp_path / "Descargas", "nota.txt", "El SQL es un lenguaje de consulta\n" * 30)
 
@@ -347,6 +347,11 @@ def test_resumir_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -
     assert resultado.exit_code == 0
     documentos = list((tmp_path / "Descargas" / "resumenes").iterdir())
     assert len(documentos) == 1
+    # Además del fallback, la CLI enseña los pasos para activar la IA.
+    salida = plano(resultado.output)
+    assert "cp .env.example .env" in salida
+    assert "TAREAS_IA_KEY" in salida
+    assert "ia.simarro" in salida
 
 
 def test_evaluar_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -> None:
@@ -363,6 +368,26 @@ def test_evaluar_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -
     assert resultado.exit_code == 0
     documentos = list((tmp_path / "Descargas" / "ejercicios").iterdir())
     assert len(documentos) == 1
+    assert "cp .env.example .env" in plano(resultado.output)
+
+
+def test_clasificar_sin_modelo_explica_como_activar_la_ia(tmp_path: Path) -> None:
+    """Sin IA, `clasificar` lo enseña antes de volcar todo a «Por clasificar»."""
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "El SQL es un lenguaje")
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    destino = tmp_path / "salida-clasificar"
+    resultado = runner.invoke(
+        app,
+        ["--config", str(ruta), "clasificar", str(tmp_path / "Descargas"),
+         "--destino", str(destino)],
+        input="n\n",  # se niega a crear las carpetas
+    )
+    salida = plano(resultado.output)
+    assert "cp .env.example .env" in salida
+    assert "TAREAS_IA_KEY" in salida
 
 
 # --------------------------------- el fallo que se reportó

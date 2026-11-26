@@ -122,6 +122,53 @@ def _despues_de(nombre: str) -> None:
     )
 
 
+def _avisa_ia_no_configurada(motivo: str) -> None:
+    """Explica cómo activar la IA cuando un comando con IA la necesita y no hay.
+
+    Lo llaman las cuatro órdenes con IA (`resumir`, `evaluar`, `clasificar` y
+    `formulario_evaluar`) antes de continuar con la versión sin IA, para que
+    el profesor (o quien pruebe la CLI por primera vez) sepa exactamente qué
+    le falta y cómo ponerlo. La orden no revienta: sigue con lo que puede,
+    como promete el ADR-0002.
+    """
+    consola.print()
+    consola.print(f"[{AVISO}]IA no disponible ({escape(motivo)}).[/]")
+    consola.print(
+        "[dim]Sigo con la versión sin IA, pero para que esta orden haga "
+        "mucho más:[/dim]"
+    )
+    consola.print(
+        f"  [bold]1.[/bold] Copia el ejemplo a la carpeta actual: "
+        f"[{NOMBRE}]cp .env.example .env[/]"
+    )
+    consola.print(
+        "  [bold]2.[/bold] Edita el fichero [.env] y rellena estas tres variables "
+        "(están explicadas dentro):"
+    )
+    consola.print(
+        "       [bold]TAREAS_IA_URL[/]  -> servidor del centro: "
+        f"[dim]https://ia.simarro/llmapi/v1[/]"
+    )
+    consola.print(
+        "       [bold]TAREAS_IA_KEY[/]  -> la clave que da el profesor "
+        "(en el aula virtual o en clase)"
+    )
+    consola.print(
+        "       [bold]TAREAS_IA_CA[/]   -> ruta al certificado propio, "
+        f"en el centro: [dim]~/.config/opencode/ca-simarro.crt[/]"
+    )
+    consola.print(
+        "  [bold]3.[/bold] Vuelve a lanzar el mismo comando: ya usará el modelo."
+    )
+    consola.print()
+    consola.print(
+        "[dim]¿Sin acceso al centro? Puedes usar un Ollama local; "
+        "mira el final de .env.example y la sección «Configurar el modelo» "
+        "del README.[/dim]"
+    )
+    consola.print()
+
+
 @app.callback()
 def principal(
     ctx: typer.Context,
@@ -299,13 +346,15 @@ def resumir(
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
-        if ProveedorIA.desde_configuracion().disponible:
+        proveedor = ProveedorIA.desde_configuracion()
+        if proveedor.disponible:
             aviso = (
                 f"Escribiendo apuntes de «{escape(archivo)}» con el modelo: "
                 "delimitando el tema e investigando; puede tardar unos minutos…"
             )
         else:
-            aviso = f"Sin modelo configurado: extracción de «{escape(archivo)}» sin IA."
+            _avisa_ia_no_configurada(proveedor.motivo_de_no_disponible())
+            aviso = f"Sin IA: extracción de «{escape(archivo)}» (versión extractiva)."
         with consola.status(aviso, spinner="dots"):
             ruta = escribir_resumen(ficha, destino, formato_preferido())
     except TareasError as exc:
@@ -333,10 +382,12 @@ def evaluar(
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
-        if ProveedorIA.desde_configuracion().disponible:
+        proveedor = ProveedorIA.desde_configuracion()
+        if proveedor.disponible:
             aviso = f"Preparando ejercicios de «{escape(archivo)}» con el modelo: puede tardar unos minutos…"
         else:
-            aviso = f"Sin modelo configurado: preparando ejercicios de «{escape(archivo)}» sin IA."
+            _avisa_ia_no_configurada(proveedor.motivo_de_no_disponible())
+            aviso = f"Sin IA: preparando ejercicios de «{escape(archivo)}» (versión extractiva)."
         with consola.status(aviso, spinner="dots"):
             ruta = escribir_evaluacion(ficha, destino, formato_preferido())
     except TareasError as exc:
@@ -379,10 +430,12 @@ def formulario_evaluar(
         contexto = resumen_previo(destino, ficha.nombre_original)
         proveedor = ProveedorIA.desde_configuracion()
         con_ia = proveedor.disponible
+        if not con_ia:
+            _avisa_ia_no_configurada(proveedor.motivo_de_no_disponible())
         aviso = (
             f"Preparando el examen interactivo de «{escape(archivo)}» con el modelo…"
             if con_ia
-            else f"Sin modelo: preparando un examen sencillo de «{escape(archivo)}»."
+            else f"Sin IA: preparando un examen sencillo de «{escape(archivo)}»."
         )
         with consola.status(aviso, spinner="dots"):
             try:
@@ -659,11 +712,14 @@ def clasificar_cmd(
     try:
         cargar(ctx.obj)
         origen = carpeta_de_trabajo(carpeta)
+        proveedor = ProveedorIA.desde_configuracion()
+        if not proveedor.disponible:
+            _avisa_ia_no_configurada(proveedor.motivo_de_no_disponible())
         with consola.status(
             "Pidiendo al modelo que agrupe los documentos por su contenido: puede tardar unos minutos…",
             spinner="dots",
         ):
-            plan = agrupador.planear(origen, usar_ia=True)
+            plan = agrupador.planear(origen, usar_ia=proveedor.disponible)
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
