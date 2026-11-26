@@ -126,7 +126,7 @@ wheels = [
 
 [[package]]
 name = "tareas"
-version = "2.2.3"
+version = "2.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "platformdirs" },
