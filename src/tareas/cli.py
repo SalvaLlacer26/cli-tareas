@@ -283,29 +283,36 @@ def resumir(
     ctx: typer.Context,
     archivo: Annotated[
         str,
-        typer.Argument(help="Nombre del archivo del que se hace el resumen."),
+        typer.Argument(help="Archivo que acota el tema (se usa solo como referencia)."),
     ],
     carpeta: Annotated[
         Path | None,
         typer.Argument(help="Carpeta donde está el archivo (por defecto, la actual)."),
     ] = None,
 ) -> None:
-    """Crea un resumen del archivo indicado en la carpeta «resumenes»."""
+    """Delimita el tema del archivo y escribe apuntes completos en «resumenes».
+
+    El archivo solo sirve para saber de qué tema va y hasta dónde llega; los
+    apuntes se escriben desde cero, investigando la teoría en internet.
+    """
     try:
         configuracion = cargar(ctx.obj)
         destino = carpeta_de_trabajo(carpeta)
         ficha = buscar_ficha(destino, archivo, configuracion.carpetas)
         if ProveedorIA.desde_configuracion().disponible:
-            aviso = f"Resumiendo «{escape(archivo)}» con el modelo: puede tardar unos minutos…"
+            aviso = (
+                f"Escribiendo apuntes de «{escape(archivo)}» con el modelo: "
+                "delimitando el tema e investigando; puede tardar unos minutos…"
+            )
         else:
-            aviso = f"Sin modelo configurado: resumiendo «{escape(archivo)}» sin IA."
+            aviso = f"Sin modelo configurado: extracción de «{escape(archivo)}» sin IA."
         with consola.status(aviso, spinner="dots"):
             ruta = escribir_resumen(ficha, destino, formato_preferido())
     except TareasError as exc:
         consola_err.print(f"[red]Error:[/red] {error_legible(exc)}")
         raise typer.Exit(code=exc.codigo_salida) from exc
 
-    consola.print(f"[green]Resumen creado:[/green] {escape(str(ruta))}")
+    consola.print(f"[green]Apuntes creados:[/green] {escape(str(ruta))}")
     _despues_de("resumir")
 
 

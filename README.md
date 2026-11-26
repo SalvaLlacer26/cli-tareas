@@ -48,8 +48,8 @@ cp acciones.json ~/.config/tareas/acciones.json
 | `tareas analizar [CARPETA]` | Analiza la carpeta y el contenido de cada fichero, renombra los que tienen nombres incompatibles y escribe una ficha `.md` por documento con los datos para clasificarlo. Muestra una tabla con la asignatura de cada fichero y pide que confirmes el análisis. |
 | `tareas organizar [CARPETA]` | Mueve cada documento a la carpeta de su asignatura usando las fichas, y le devuelve el nombre original. Muestra un resumen. |
 | `tareas deshacer [CARPETA]` | Deshace lo hecho por `organizar` y por `clasificar`: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
-| `tareas resumir 'ARCHIVO' [CARPETA]` | Usa el archivo para identificar el tema, **investiga la teoría en internet** y escribe un resumen de estudio (con las fuentes al final) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. |
-| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea un examen sobre la teoría investigada del tema (mínimo 10 preguntas) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. Se puede aprobar estudiando el resumen de `resumir`, y cada ejecución genera un examen distinto. |
+| `tareas resumir 'ARCHIVO' [CARPETA]` | Delimita de qué tema va el archivo y **hasta dónde llega**, y escribe **apuntes completos desde cero** de ese rango (investigando la teoría en internet, con las fuentes al final) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. **No resume: el documento solo acota el tema.** |
+| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea un examen sobre la teoría investigada del tema (mínimo 10 preguntas) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. Se puede aprobar estudiando los apuntes de `resumir`, y cada ejecución genera un examen distinto. |
 | `tareas formulario_evaluar 'ARCHIVO' [CARPETA]` | **(En pruebas)** El mismo examen en un formulario HTML que abre en el navegador: tipo test con botones y preguntas escritas con su hueco. Al enviar, corrige en `127.0.0.1` y la IA revisa lo escrito. Se cierra con Enter. |
 | `tareas clasificar [CARPETA] --destino RUTA` | Crea en `RUTA` un grupo de carpetas **decidido por la IA** según el contenido, y mueve cada documento dentro. Coloca todos los ficheros (también fotos e instaladores, por su nombre y tipo); lo que no se pueda clasificar va a «Por clasificar». |
 | `tareas comandos` | Lista todos los comandos, cómo se usan y para qué sirven. |
@@ -124,12 +124,13 @@ volver a organizar sin analizar otra vez.
 ### 4 · `resumir` y `evaluar`
 
 Trabajan sobre lo que ya hay en la ficha, así que no vuelven a abrir el
-documento. **El documento es solo la referencia del tema**: un modelo de IA lo
-usa para saber de qué va y **busca en internet la teoría** para escribir un
-**resumen de estudio de verdad** (qué es cada cosa, para qué sirve, un ejemplo y
-qué se pregunta en un examen) y un **examen que se puede aprobar estudiando ese
-resumen**. El resultado sale con apartados, negritas y tablas, y las fuentes
-consultadas van al final.
+documento. En `resumir` **el documento no se resume ni se copia**: solo sirve
+para **delimitar el tema y su rango** (de qué va y hasta dónde llega). Con esa
+acotación, un modelo de IA escribe **apuntes completos desde cero** del rango,
+**buscando la teoría en internet**, con la riqueza necesaria para aprobar un
+examen de ese tema acotado. `evaluar` prepara, del mismo tema, un **examen que
+se puede aprobar estudiando esos apuntes**. Todo sale con apartados, negritas y
+tablas, y las fuentes consultadas van al final.
 
 El formato del fichero que se crea depende del sistema operativo:
 
@@ -169,25 +170,32 @@ TAREAS_IA_CA=~/.config/opencode/ca-simarro.crt
 El fichero `.env` se busca en la carpeta desde la que se lanza la orden y en
 `~/.config/tareas/.env`. Las variables de entorno del sistema tienen prioridad.
 
-#### La IA investiga el tema en internet
+#### `resumir` delimita el tema y escribe apuntes, no un resumen
 
 Un PDF de diapositivas puede tener 17 páginas y solo 400 caracteres de texto,
-pero es que **aunque el documento tenga texto, lo que importa es la teoría
-buena, no repetir el PDF**. Por eso `resumir` y `evaluar` no copian el
-documento: lo usan para identificar el tema y luego **investigan en internet**.
+pero aunque tenga texto **no se copia**: `resumir` lo usa solo para saber **de
+qué tema va y hasta dónde llega**. Por ejemplo, un tema de «Componentes de un
+PC» que en el documento se queda en los microprocesadores: los apuntes cubrirán
+desde el principio **hasta los microprocesadores**, y no desarrollarán memoria
+ni gráfica (eso es de otro examen).
 
-Para eso, el modelo pide lo que necesita. Escribe una línea con la forma
-`[[BUSCAR: consulta]]` (una por concepto) y la herramienta busca esa información
-en internet —Wikipedia **y los resultados de la web** de DuckDuckGo en modo
-*lite*, sin claves ni servicios de pago—, se la devuelve con varias fuentes para
-que **elija la mejor**, y el modelo termina de escribir. Así tiene opciones más
-allá de la enciclopedia: documentación, blogs técnicos, apuntes. **Las fuentes
-consultadas se escriben al final del documento**, con su URL.
+Lo hace en dos tiempos:
 
-El mismo mecanismo se usa en `evaluar`: el examen se pregunta sobre la teoría
-investigada, no sobre lo que pone literalmente en el PDF. Si ya hiciste `tareas
-resumir` de ese tema, ese resumen (con la teoría buscada) se usa como base, de
-modo que **estudiar el resumen sirva para resolver el examen**.
+1. **Delimitar.** El modelo ve el principio y el final del documento y devuelve
+   un JSON con el tema, el nivel, los subtemas que trata (`cubre`) y los que **no
+   llega** a tratar (`fuera`). Ese `fuera` es el límite de los apuntes.
+2. **Escribir apuntes completos.** Sin el documento delante, el modelo redacta
+   unos apuntes de manual del rango exacto: definiciones, funcionamiento,
+   ejemplos, tablas, un «en el examen» por apartado, «ideas clave» y «preguntas
+   típicas». Para no inventar, **investiga la teoría en internet** con el mismo
+   mecanismo que `evaluar`: el modelo pide con `[[BUSCAR: consulta]]` y la
+   herramienta le devuelve fuentes de Wikipedia **y de la web** (DuckDuckGo *lite*,
+   sin claves ni servicios de pago) para que elija la mejor. **Las fuentes
+   consultadas se escriben al final del documento**, con su URL.
+
+En `evaluar` se pregunta sobre esa misma teoría investigada. Si antes hiciste
+`tareas resumir` del tema, esos **apuntes** se usan como base del examen, de modo
+que **estudiarlos sirva para resolverlo**.
 
 #### `formulario_evaluar`: el examen en el navegador (en pruebas)
 
@@ -214,11 +222,12 @@ clasificar»**, que la CLI te enseña en la consola para que la revises.
 
 #### Sin red o sin clave
 
-Si no hay modelo (no hay clave, no hay red, el servidor falla), la CLI **no
-se rompe**: lo explica en una línea y genera la versión extractiva, que corta
-las primeras 25 líneas de cada apartado. El documento lleva una nota dizendo
-que se ha hecho sin IA, para que nadie se tome por bueno un resumen que no lo
-es.
+Si no hay modelo (no hay clave, no hay red, el servidor falla), la CLI **no se
+rompe**: lo explica en una línea. Como sin IA no se pueden escribir apuntes
+desde cero, `resumir` guarda una extracción del documento con las fuentes que ha
+podido buscar, y el documento lleva una nota que dice claro que **no son los
+apuntes**, para que nadie se studye algo que no es. `evaluar` hace lo propio con
+su versión extractiva.
 
 #### En la terminal
 
@@ -231,10 +240,12 @@ cierre no aparece: la salida se mantiene limpia.
 
 #### Privacidad
 
-Al resumir o evaluar, **el texto del documento sale del equipo** y va al
-servidor que tengas configurado. Con la configuración por defecto va a
-`ia.simarro`, que es un servidor de tu instituto. Si prefieres que no salga
-nada, usa un Ollama en local:
+Al delimitar el tema en `resumir` (principio y final del documento) y al preparar
+`evaluar`, **parte del texto del documento sale del equipo** y va al servidor que
+tengas configurado. La fase de escribir los apuntes ya no reenvía el documento:
+trabaja solo con la acotación y con lo que investiga en internet. Con la
+configuración por defecto va a `ia.simarro`, que es un servidor de tu instituto.
+Si prefieres que no salga nada, usa un Ollama en local:
 
 ```bash
 TAREAS_IA_URL=http://localhost:11434/v1
@@ -299,12 +310,14 @@ trabajo**: avisan y generan una versión extractiva, que corta el principio de
 cada apartado. El documento lleva una nota que lo dice. Es el modo sin red:
 las otras seis órdenes siguen funcionando igual.
 
-### El resumen extractivo es una extracción, no un resumen
+### `tareas resumir`: con IA son apuntes, sin IA solo una extracción
 
-Cuando el resumen lo hace la IA, es un resumen de verdad. Cuando cae al
-respaldo extractivo, lo que sale son las primeras 25 líneas de cada apartado:
-es una extracción, y el documento lo indica. Lo que **no** hace ninguna de las
-dos versiones es inventar contenido que no esté en el documento.
+Con modelo, `resumir` **escribe apuntes completos desde cero** del tema acotado
+(no un resumen del documento). Si no hay modelo, escribir apuntes nuevos no es
+posible: lo que se guarda es una **extracción** del documento (las primeras 25
+líneas de cada apartado) con las fuentes de internet que se hayan podido buscar,
+y una nota que dice claro que **no son los apuntes**. Es el modo sin red: las
+demás órdenes siguen funcionando igual.
 
 ## Estructura
 
@@ -344,7 +357,7 @@ cli-tareas/
 │   ├── busqueda.py         # buscar en internet (Wikipedia, DuckDuckGo)
 │   ├── markdown.py         # de la respuesta en Markdown a las secciones
 │   ├── agrupador.py        # el comando «clasificar»: carpetas decididas por la IA
-│   ├── resumen.py          # el resumen
+│   ├── resumen.py          # delimitar el tema y escribir apuntes (comando «resumir»)
 │   ├── evaluacion.py       # los ejercicios
 │   ├── examenes.py         # formulario_evaluar: examen interactivo en el navegador
 │   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)

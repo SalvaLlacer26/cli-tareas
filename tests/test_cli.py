@@ -381,8 +381,13 @@ def test_el_resumen_nunca_lleva_una_marca_de_busqueda(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(
         resumen,
-        "pedir_resumen",
-        lambda ficha: (_ for _ in ()).throw(
+        "delimitar_tema",
+        lambda ficha: resumen.Alcance(tema="Bases de datos", cubre=["tablas"]),
+    )
+    monkeypatch.setattr(
+        resumen,
+        "generar_apuntes",
+        lambda alcance: (_ for _ in ()).throw(
             __import__("tareas.errores", fromlist=["ErrorIA"]).ErrorIA(
                 "el modelo no ha dado una respuesta utilizable"
             )
