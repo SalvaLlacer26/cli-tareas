@@ -1,190 +1,214 @@
-"""El organizador: reparte una carpeta en las carpetas de asignatura y la devuelve.
+"""El comando «organizar» y el comando «deshacer».
 
-Son dos operaciones inversas:
+«organizar» lee las fichas .md de la carpeta oculta «md», y mueve cada
+documento a la carpeta de su asignatura. Al moverlo **devuelve el nombre
+original**: el renombrado que hizo «analizar» era solo para trabajar cómodo,
+así que el fichero acaba en su destino con el nombre que tenía.
 
-- ``organizar``: mira cada fichero de la carpeta de descargas, decide a qué
-  asignatura pertenece y lo mueve allí **renombrándolo** a un formato que el
-  CLI entiende (prefijo de la clave + nombre limpio). Si el nombre no dice
-  nada, se mira el resumen de texto que va al lado; si tampoco, el fichero va
-  a la carpeta de respaldo.
-
-- ``desorganizar``: deshace lo anterior, devolviendo los ficheros a la
-  carpeta de descargas con su nombre original (que se recupera del manifiesto).
-
-Las dos son reversibles porque el manifiesto recuerda de dónde salió cada
-fichero.
+«deshacer» hace lo contrario: devuelve los documentos a la carpeta de origen
+con su nombre original. La carpeta de fichas se conserva, porque es el
+historial del análisis.
 """
 
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from .acciones import ERROR, HECHO, SIMULADO, Resultado, destino_libre
-from .carpetas import Carpeta, clasificar, de_respaldo
+from . import ficha as fichas
 from .errores import TareasError
-from .manifiesto import Manifiesto
-from .nombres import normalizar
+from .nombres import sin_conflicto
 
-#: Extensión del resumen de texto que va al lado de un documento.
-EXTENSION_RESUMEN = ".md"
-
-#: Cuántos caracteres de un resumen se leen. Es un fichero de texto pequeño,
-#: pero no hace falta leerlo entero para clasificar.
-MAXIMO_RESUMEN = 20000
+#: Carpeta donde se guardan las fichas .md.
+CARPETA_FICHAS = "md"
 
 
-def _leer_resumen(carpeta: Path, base: str) -> str | None:
-    """Lee el resumen que va al lado del fichero, si lo hay."""
-    resumen = carpeta / f"{base}{EXTENSION_RESUMEN}"
-    if not resumen.is_file():
-        return None
-    try:
-        texto = resumen.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return None
-    return texto[:MAXIMO_RESUMEN]
+@dataclass
+class Movimiento:
+    """Un fichero que se ha movido."""
+
+    nombre_original: str
+    origen: str
+    destino: str
+    estado: str = "movido"
 
 
-def _es_resumen_suelto(carpeta: Path, fichero: Path) -> bool:
-    """Si este .md es el resumen de otro fichero, no se organiza por su cuenta."""
-    if fichero.suffix.lower() != EXTENSION_RESUMEN:
-        return False
-    return any(
-        otro.stem == fichero.stem and otro.suffix.lower() != EXTENSION_RESUMEN
-        for otro in carpeta.iterdir()
-        if otro.is_file()
+@dataclass
+class ResultadoOrganizacion:
+    """Lo que ha hecho una organización o una deshacedura."""
+
+    movimientos: list[Movimiento] = field(default_factory=list)
+    por_carpeta: dict[str, int] = field(default_factory=dict)
+    sin_ficha: list[str] = field(default_factory=list)
+    ya_organizado: list[str] = field(default_factory=list)
+
+    @property
+    def total(self) -> int:
+        return len(self.movimientos)
+
+
+def _fichas_de(carpeta: Path) -> list[Path]:
+    """Las fichas .md de la carpeta «md»."""
+    directorio = carpeta / CARPETA_FICHAS
+    if not directorio.is_dir():
+        return []
+    return sorted(directorio.glob("*.md"), key=lambda p: p.name.lower())
+
+
+def _buscar_fichas(carpeta: Path, carpetas: list | None = None) -> list[Path]:
+    """Busca las fichas en la carpeta «md» y en las de sus subcarpetas.
+
+    Después de «organizar» las fichas están en la carpeta «md» de cada
+    asignatura, que es hermana de la carpeta de origen y no está dentro de
+    ella. Por eso se buscan también en las carpetas de destino que declara la
+    configuración: así «deshacer» funciona se ejecute desde donde se ejecute.
+    """
+    candidatas: list[Path] = [carpeta]
+    candidatas += sorted(
+        (d for d in carpeta.rglob(CARPETA_FICHAS) if d.is_dir()), key=lambda p: str(p)
     )
+    for definicion in carpetas or []:
+        candidatas.append(definicion.destino)
+        candidatas += sorted(
+            (d for d in definicion.destino.rglob(CARPETA_FICHAS) if d.is_dir()),
+            key=lambda p: str(p),
+        )
+
+    encontradas: list[Path] = []
+    vistos: set[Path] = set()
+    for base in candidatas:
+        directorio = base / CARPETA_FICHAS
+        if directorio in vistos or not directorio.is_dir():
+            continue
+        vistos.add(directorio)
+        for ruta in sorted(directorio.glob("*.md"), key=lambda p: p.name.lower()):
+            if ruta not in encontradas:
+                encontradas.append(ruta)
+    return encontradas
 
 
-class Organizador:
-    """Reparte los ficheros de una carpeta entre las carpetas de asignatura."""
+def organizar(carpeta: Path) -> ResultadoOrganizacion:
+    """Reparte los documentos de una carpeta según sus fichas."""
+    carpeta = Path(carpeta).expanduser()
+    if not carpeta.is_dir():
+        raise TareasError(f"La carpeta «{carpeta}» no existe o no es una carpeta.")
 
-    def __init__(
-        self,
-        carpetas: list[Carpeta],
-        manifiesto: Manifiesto | None = None,
-        documentos: list[str] | None = None,
-    ) -> None:
-        self.carpetas = carpetas
-        self.manifiesto = manifiesto if manifiesto is not None else Manifiesto()
-        self.documentos = [d.lower() for d in (documentos or [])]
+    resultado = ResultadoOrganizacion()
+    fichas_encontradas = _fichas_de(carpeta)
+    if not fichas_encontradas:
+        raise TareasError(
+            f"No hay fichas en «{carpeta / CARPETA_FICHAS}». "
+            "Ejecuta primero «tareas analizar» en esta carpeta."
+        )
 
-    def organizar(self, origen: Path, simular: bool) -> list[Resultado]:
-        """Clasifica y renombra todo lo que hay en «origen»."""
-        origen = origen.expanduser()
-        if not origen.is_dir():
-            raise TareasError(f"La carpeta «{origen}» no existe o no es una carpeta.")
+    for ruta_ficha in fichas_encontradas:
+        ficha = fichas.leer(ruta_ficha)
+
+        if ficha.estado == fichas.FORMATO_INVALIDO:
+            resultado.sin_ficha.append(ficha.nombre_original)
+            continue
+
+        origen = carpeta / ficha.nombre_compatible
+        if not origen.exists():
+            # Ya no está aquí: puede que esté en su carpeta de destino.
+            resultado.ya_organizado.append(ficha.nombre_original)
+            continue
+
+        destino_carpeta = Path(ficha.destino) if ficha.destino else None
+        if destino_carpeta is None or not ficha.carpeta:
+            resultado.sin_ficha.append(ficha.nombre_original)
+            continue
+
+        destino_carpeta.mkdir(parents=True, exist_ok=True)
+        destino = destino_carpeta / ficha.nombre_original
+        destino = sin_conflicto(destino_carpeta, ficha.nombre_original)
 
         try:
-            entradas = sorted(origen.iterdir(), key=lambda p: p.name.lower())
-        except OSError as exc:
-            raise TareasError(
-                f"No puedo leer la carpeta «{origen}»: {exc.strerror or exc}."
-            ) from exc
-
-        resultados: list[Resultado] = []
-        for fichero in entradas:
-            if not fichero.is_file():
-                continue
-            if _es_resumen_suelto(origen, fichero):
-                # Es el resumen de otro fichero: se moverá con él.
-                continue
-            resultados.extend(self._organizar_fichero(origen, fichero, simular))
-
-        if not simular:
-            self.manifiesto.guardar()
-        return resultados
-
-    def _organizar_fichero(self, origen: Path, fichero: Path, simular: bool) -> list[Resultado]:
-        """Clasifica un fichero (y su resumen, si tiene) y los mueve."""
-        resumen = _leer_resumen(origen, fichero.stem)
-
-        if self.documentos and fichero.suffix.lower() not in self.documentos:
-            # Un instalador o una foto no son apuntes, aunque su nombre
-            # coincida con el de una asignatura: van a la carpeta de respaldo.
-            carpeta = de_respaldo(self.carpetas)
-            if carpeta is None:
-                raise TareasError(
-                    "No hay ninguna carpeta de respaldo para lo que no se sepa clasificar"
-                )
-        else:
-            carpeta = clasificar(self.carpetas, fichero.name, resumen)
-
-        nombre_nuevo = normalizar(fichero.name, carpeta.clave)
-        destino = destino_libre(carpeta.destino / nombre_nuevo)
-
-        resultados = [self._mover(fichero, destino, simular)]
-        if not resultados[0].estado == ERROR:
-            self.manifiesto.registrar(destino, fichero.name)
-
-        # El resumen de texto viaja con su documento.
-        if resumen is not None:
-            resumen_origen = origen / f"{fichero.stem}{EXTENSION_RESUMEN}"
-            resumen_destino = destino.with_name(f"{destino.stem}{EXTENSION_RESUMEN}")
-            resultados.append(self._mover(resumen_origen, resumen_destino, simular))
-            if not resultados[-1].estado == ERROR:
-                self.manifiesto.registrar(resumen_destino, resumen_origen.name)
-
-        return resultados
-
-    @staticmethod
-    def _mover(origen: Path, destino: Path, simular: bool) -> Resultado:
-        if simular:
-            return Resultado(origen, destino, SIMULADO)
-        try:
-            destino.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(origen), str(destino))
         except OSError as exc:
-            return Resultado(origen, None, ERROR, exc.strerror or str(exc))
-        return Resultado(origen, destino, HECHO)
+            raise TareasError(
+                f"No puedo mover «{ficha.nombre_original}» a «{destino_carpeta}»: "
+                f"{exc.strerror or exc}."
+            ) from exc
+
+        # La ficha viaja con su documento, en la carpeta oculta del destino.
+        destino_fichas = destino_carpeta / CARPETA_FICHAS
+        destino_fichas.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.move(str(ruta_ficha), str(destino_fichas / ruta_ficha.name))
+        except OSError:
+            pass
+
+        resultado.movimientos.append(
+            Movimiento(
+                nombre_original=ficha.nombre_original,
+                origen=str(origen),
+                destino=str(destino),
+            )
+        )
+        resultado.por_carpeta[ficha.carpeta] = resultado.por_carpeta.get(ficha.carpeta, 0) + 1
+
+    return resultado
 
 
-class Desorganizador:
-    """Devuelve los ficheros clasificados a la carpeta de descargas."""
+def deshacer(carpeta: Path, carpetas: list | None = None) -> ResultadoOrganizacion:
+    """Devuelve los documentos a su carpeta de origen.
 
-    def __init__(self, carpetas: list[Carpeta], manifiesto: Manifiesto | None = None) -> None:
-        self.carpetas = carpetas
-        self.manifiesto = manifiesto if manifiesto is not None else Manifiesto()
+    La carpeta de fichas no se borra: sus ficheros vuelven a la carpeta «md»
+    de la carpeta de origen, así que el análisis se conserva y se puede volver
+    a organizar sin analizar otra vez.
+    """
+    carpeta = Path(carpeta).expanduser()
+    if not carpeta.is_dir():
+        raise TareasError(f"La carpeta «{carpeta}» no existe o no es una carpeta.")
 
-    def desorganizar(self, destino: Path, simular: bool) -> list[Resultado]:
-        """Trae de vuelta todo lo que hay en las carpetas de asignatura."""
-        destino = destino.expanduser()
-        resultados: list[Resultado] = []
+    resultado = ResultadoOrganizacion()
+    rutas_fichas = _buscar_fichas(carpeta, carpetas)
+    if not rutas_fichas:
+        raise TareasError(
+            f"No hay fichas en «{carpeta}». No se puede deshacer nada aquí."
+        )
 
-        for carpeta in self.carpetas:
-            if not carpeta.destino.is_dir():
-                continue
-            try:
-                entradas = sorted(carpeta.destino.iterdir(), key=lambda p: p.name.lower())
-            except OSError as exc:
-                raise TareasError(
-                    f"No puedo leer la carpeta «{carpeta.destino}»: {exc.strerror or exc}."
-                ) from exc
+    for ruta_ficha in rutas_fichas:
+        ficha = fichas.leer(ruta_ficha)
+        if not ficha.destino:
+            continue
 
-            for fichero in entradas:
-                if not fichero.is_file():
-                    continue
-                resultados.append(self._devolver(fichero, destino, simular))
+        origen = Path(ficha.destino) / ficha.nombre_original
+        if not origen.exists():
+            resultado.ya_organizado.append(ficha.nombre_original)
+            continue
 
-        if not simular:
-            self.manifiesto.guardar()
-        return resultados
-
-    def _devolver(self, fichero: Path, destino: Path, simular: bool) -> Resultado:
-        """Devuelve un fichero a la carpeta de descargas con su nombre original."""
-        original = self.manifiesto.nombre_original(fichero)
-        nombre = original if original else fichero.name
-        final = destino_libre(destino / nombre)
-
-        if simular:
-            return Resultado(fichero, final, SIMULADO)
+        destino_carpeta = Path(ficha.origen) if ficha.origen else carpeta
+        destino_carpeta.mkdir(parents=True, exist_ok=True)
+        destino = sin_conflicto(destino_carpeta, ficha.nombre_original)
 
         try:
-            destino.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(fichero), str(final))
+            shutil.move(str(origen), str(destino))
         except OSError as exc:
-            return Resultado(fichero, None, ERROR, exc.strerror or str(exc))
+            raise TareasError(
+                f"No puedo devolver «{ficha.nombre_original}» a «{destino_carpeta}»: "
+                f"{exc.strerror or exc}."
+            ) from exc
 
-        self.manifiesto.olvidar(fichero)
-        return Resultado(fichero, final, HECHO)
+        # La ficha se conserva: vuelve a la carpeta «md» de la carpeta de origen.
+        destino_fichas = destino_carpeta / CARPETA_FICHAS
+        destino_fichas.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.move(str(ruta_ficha), str(destino_fichas / ruta_ficha.name))
+        except OSError:
+            pass
+
+        resultado.movimientos.append(
+            Movimiento(
+                nombre_original=ficha.nombre_original,
+                origen=str(origen),
+                destino=str(destino),
+                estado="devuelto",
+            )
+        )
+        etiqueta = ficha.carpeta or "origen"
+        resultado.por_carpeta[etiqueta] = resultado.por_carpeta.get(etiqueta, 0) + 1
+
+    return resultado

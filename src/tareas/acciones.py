@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .config import problema_nombre
 from .errores import AccionNoValida, TareasError
+from .nombres import problema_nombre
 
 #: Estados posibles de un fichero tras pasar por una acción.
 HECHO = "hecho"
