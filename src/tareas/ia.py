@@ -23,6 +23,7 @@ import json
 import os
 import re
 import ssl
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -51,6 +52,10 @@ TIEMPO_ESPERA = 600
 
 #: Cuántos tokens se piden como máximo.
 TOKENS_MAXIMOS = 3000
+
+#: Una respuesta más corta que esto no sirve para nada. Sirve para detectar el
+#: caso en que el modelo solo devuelve su petición de búsqueda.
+MINIMO_RESPUESTA = 20
 
 #: Variable para cambiar el tiempo de espera.
 VAR_TIEMPO = "TAREAS_IA_TIMEOUT"
@@ -178,47 +183,11 @@ def pedir(
     Lanza ErrorIA con un mensaje de una línea si algo falla: sin clave, sin
     red, con un error del servidor o con una respuesta que no se entiende.
     """
-    config = configuracion()
-    if not config.url or not config.clave:
-        raise ErrorIA(f"no se puede usar el modelo: {motivo_de_no_disponible()}")
-
-    cuerpo = {
-        "model": config.modelo,
-        "messages": [
-            {"role": "system", "content": sistema},
-            {"role": "user", "content": usuario if usuario else contenido},
-        ],
-        "max_tokens": TOKENS_MAXIMOS,
-        "temperature": temperatura,
-    }
-
-    peticion = urllib.request.Request(
-        _endpoint(config, "chat/completions"),
-        data=json.dumps(cuerpo).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {config.clave}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(
-            peticion, timeout=config.tiempo, context=_contexto_ssl(config)
-        ) as respuesta:
-            datos = json.loads(respuesta.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        raise ErrorIA(f"el servidor de modelos respondió con un error ({exc.code})") from exc
-    except urllib.error.URLError as exc:
-        raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise ErrorIA("el servidor de modelos no ha contestado a tiempo") from exc
-    except OSError as exc:
-        raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ErrorIA("el servidor de modelos ha contestado algo que no es JSON") from exc
-
-    return _extraer_texto(datos)
+    mensajes = [
+        {"role": "system", "content": sistema},
+        {"role": "user", "content": usuario if usuario else contenido},
+    ]
+    return pedir_con_historial(sistema, mensajes, temperatura=temperatura)
 
 
 def _extraer_texto(datos: dict) -> str:
@@ -271,6 +240,24 @@ def buscar_en_la_respuesta(respuesta: str) -> list[str]:
     return consultas
 
 
+def limpiar_marcadores(respuesta: str) -> str:
+    """Quita de la respuesta las marcas de petición de búsqueda.
+
+    Si la marca se colara en el documento, el usuario vería un
+    «[[BUSCAR: ...]]» en medio del resumen. Y una línea que solo era la
+    petición de búsqueda se elimina entera.
+    """
+    lineas = []
+    for linea in respuesta.splitlines():
+        if RE_BUSQUEDA.search(linea):
+            resto = RE_BUSQUEDA.sub("", linea).strip()
+            if resto:
+                lineas.append(resto)
+            continue
+        lineas.append(linea)
+    return "\n".join(lineas).strip()
+
+
 def pedir_con_busqueda(
     sistema: str,
     usuario: str,
@@ -287,7 +274,8 @@ def pedir_con_busqueda(
     resultados y se le vuelve a preguntar. Así el modelo decide **él
     mismo** si el documento es demasiado escueto y hay que completarlo.
 
-    Devuelve la respuesta final y las fuentes que se han usado.
+    Devuelve la respuesta final (sin marcas de búsqueda) y las fuentes que se
+    han usado.
     """
     from .busqueda import buscar, como_texto
 
@@ -297,33 +285,49 @@ def pedir_con_busqueda(
     ]
     fuentes: list[Fuente] = []
     vistas: set[str] = set()
+    respuesta = ""
 
     for _ in range(maximo_consultas + 1):
         respuesta = pedir_con_historial(sistema, mensajes)
         consultas = buscar_en_la_respuesta(respuesta)
 
         if not consultas:
-            return respuesta, fuentes
+            break
 
+        encontradas: list[Fuente] = []
         for consulta in consultas:
+            # «buscar» ya prueba versiones más cortas si la consulta es larga.
             for fuente in buscar(consulta):
                 if fuente.url in vistas:
                     continue
                 vistas.add(fuente.url)
-                fuentes.append(fuente)
+                encontradas.append(fuente)
 
-        if not fuentes:
-            # Se ha intentado buscar y no ha salido nada: se sigue con lo que
-            # hay, para no quedarse esperando.
-            return respuesta, fuentes
+        if not encontradas:
+            # No ha salido nada: se le dice al modelo que ya responda, en vez
+            # de devolver su petición de búsqueda como si fuera la respuesta.
+            mensajes.append({"role": "assistant", "content": respuesta})
+            mensajes.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "No he encontrado nada con esa búsqueda. Escribe YA la "
+                        "respuesta final, sin buscar nada más, usando solo el "
+                        "documento. Si el documento es escueto, resume lo que haya y "
+                        "no inventes."
+                    ),
+                }
+            )
+            continue
 
+        fuentes.extend(encontradas)
         mensajes.append({"role": "assistant", "content": respuesta})
         mensajes.append(
             {
                 "role": "user",
                 "content": (
                     "RESULTADOS DE LA BÚSQUEDA EN INTERNET:\n\n"
-                    f"{como_texto(fuentes)}\n\n"
+                    f"{como_texto(encontradas)}\n\n"
                     "Continúa con la tarea usando esta información. No la repitas "
                     "entera: úsala para completar lo que faltaba. Si te falta algo "
                     "más, pídelo otra vez con [[BUSCAR: consulta]]; si ya tienes "
@@ -332,11 +336,32 @@ def pedir_con_busqueda(
             }
         )
 
-    return respuesta, fuentes
+    limpio = limpiar_marcadores(respuesta)
+    if len(limpio.strip()) < MINIMO_RESPUESTA:
+        raise ErrorIA(
+            "el modelo no ha dado una respuesta utilizable (solo pedía buscar)"
+        )
+    return limpio, fuentes
 
 
-def pedir_con_historial(sistema: str, mensajes: list[dict[str, str]]) -> str:
-    """Pide una respuesta teniendo en cuenta el historial de la conversación."""
+
+#: Códigos del servidor que suelen ser momentáneos: se reintenta.
+ERRORES_MOMENTANEOS = (429, 500, 502, 503, 504)
+
+#: Cuánto se espera entre reintentos, en segundos.
+ESPERA_REINTENTOS = (3, 8, 20)
+
+
+def pedir_con_historial(
+    sistema: str,
+    mensajes: list[dict[str, str]],
+    temperatura: float = 0.3,
+) -> str:
+    """Pide una respuesta teniendo en cuenta el historial de la conversación.
+
+    Si el servidor contesta con un error momentáneo (503, 502…), se reintenta:
+    los servidores de modelos se saturan y un 503 no es motivo para rendirse.
+    """
     config = configuracion()
     if not config.url or not config.clave:
         raise ErrorIA(f"no se puede usar el modelo: {motivo_de_no_disponible()}")
@@ -358,20 +383,33 @@ def pedir_con_historial(sistema: str, mensajes: list[dict[str, str]]) -> str:
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(
-            peticion, timeout=config.tiempo, context=_contexto_ssl(config)
-        ) as respuesta:
-            datos = json.loads(respuesta.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        raise ErrorIA(f"el servidor de modelos respondió con un error ({exc.code})") from exc
-    except urllib.error.URLError as exc:
-        raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise ErrorIA("el servidor de modelos no ha contestado a tiempo") from exc
-    except OSError as exc:
-        raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ErrorIA("el servidor de modelos ha contestado algo que no es JSON") from exc
-
+    for intento, espera in enumerate((0, *ESPERA_REINTENTOS)):
+        if espera:
+            time.sleep(espera)
+        try:
+            with urllib.request.urlopen(
+                peticion, timeout=config.tiempo, context=_contexto_ssl(config)
+            ) as respuesta:
+                datos = json.loads(respuesta.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in ERRORES_MOMENTANEOS and intento < len(ESPERA_REINTENTOS):
+                continue
+            raise ErrorIA(
+                f"el servidor de modelos respondió con un error ({exc.code})"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise ErrorIA(
+                f"no se puede contactar con el servidor de modelos: {exc.reason}"
+            ) from exc
+        except TimeoutError as exc:
+            raise ErrorIA("el servidor de modelos no ha contestado a tiempo") from exc
+        except OSError as exc:
+            raise ErrorIA(f"no se puede contactar con el servidor de modelos: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ErrorIA(
+                "el servidor de modelos ha contestado algo que no es JSON"
+            ) from exc
+    else:
+        raise ErrorIA("el servidor de modelos no ha podido atender la petición")
     return _extraer_texto(datos)

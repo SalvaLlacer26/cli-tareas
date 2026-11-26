@@ -6,6 +6,35 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.2.1] — 2026-11-04
+
+Arreglo de `tareas resumir`: el documento se quedaba con una línea
+`[[BUSCAR: ...]]` en vez de un resumen.
+
+### Corregido
+
+- **La marca de búsqueda ya no puede colarse en el documento.** Si el modelo
+  pide buscar y la búsqueda no da nada, se le vuelve a preguntar; si aun así
+  contesta con la marca, se limpia y, si no queda contenido, se avisa y se cae
+  al resumen extractivo. Nunca se escribe un documento con «[[BUSCAR: ...]]».
+- **Una consulta larga ya no se queda sin resultados.** El modelo pedía
+  «Introducción a las bases de datos conceptos ficheros SGBD Alejandro
+  Hernández Doménech» y Wikipedia no encontraba nada. Ahora la búsqueda
+  prueba versiones más cortas y quita los encabezados tipo «Ud1.» o «Tema 3»,
+  que en los apuntes de clase aparecen constantly y empastan cualquier
+  búsqueda.
+- **Las fuentes se ordenan por relevancia** y se descartan las que no tienen
+  ninguna palabra en común con la consulta. Buscar «bases de datos» ya no
+  devuelve la biografía de alguien con «datos» en el nombre.
+- **Wikipedia con muchas seguidas devolvía 403.** Ahora las peticiones se
+  reintentan, se espera entre ellas y se cachean.
+- **Los errores momentáneos del servidor de modelos se reintentan.** Un 503
+  del centro ya no acaba el intento a la primera: se reintenta tres veces.
+- **Si no hay modelo, al menos se busca en internet.** El documento incluye las
+  fuentes encontradas sobre su tema, marcadas como lo que son, en vez de
+  quedarse con un resumen vacío.
+- 14 pruebas nuevas (143 en total), ninguna sale a internet.
+
 ## [v2.2.0] — 2026-11-02
 
 La IA ya no solo resume: **busca en internet** para completar los documentos
