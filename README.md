@@ -331,6 +331,7 @@ cli-tareas/
 ├── .gitattributes          # * text=auto
 ├── acciones.json           # la configuración: asignaturas y acciones
 ├── docs/
+│   ├── spec.md                             # la spec de 10 líneas (para quién, qué hará y qué NO)
 │   ├── adr/0001-configuracion-externa.md   # por qué las acciones van fuera del código
 │   ├── adr/0002-capa-ia-modo-sin-red.md     # por qué la IA es una capa con modo sin red
 │   └── prompts.md
@@ -363,7 +364,7 @@ cli-tareas/
 │   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)
 │   ├── motor.py            # el motor de las acciones genéricas
 │   └── errores.py          # TareasError, ConfigError, AccionNoValida
-└── tests/                  # 83 pruebas
+└── tests/                  # 194 pruebas (pytest + CI en Linux, Windows y macOS)
 ```
 
 ## Multiplataforma
@@ -384,3 +385,19 @@ cli-tareas/
 - `tareas ejecutar` admite `--simular`, que enseña qué haría sin tocar nada.
 - Prueba siempre en `~/pruebas-tareas`, nunca sobre tus carpetas reales.
   Con `--config pruebas/acciones-prueba.json` todas las rutas apuntan ahí.
+
+## Proceso y releases
+
+- **Una orden para instalar** (probada desde otra carpeta):
+  `uv tool install git+https://github.com/SalvaLlacer26/cli-tareas` (o `pipx
+  install …`). Tras instalar, `tareas --help` y `tareas version` funcionan desde
+  cualquier sitio. Se desinstala con `uv tool uninstall tareas`.
+- **Historial real con ramas.** El trabajo entra a `main` por *feature branches*
+  integradas con `git merge --no-ff`, así que el grafo (`git log --graph`)
+  muestra la rama y su punto de merges legible, igual que un PR. Cada paso va en
+  su commit con mensaje que cuenta qué y por qué.
+- **Releases etiquetadas.** Cada versión va con su *tag* anotado (`git tag -a`) y
+  su entrada en `CHANGELOG.md` (formato *Keep a Changelog*, versionado semántico).
+  La última release es la etiqueta `v2.6.0`.
+- **Calidad continua.** `pytest` en tres sistemas (Linux, Windows, macOS) en cada
+  *push* vía GitHub Actions (`.github/workflows/pruebas.yml`).
