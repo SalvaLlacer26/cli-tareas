@@ -31,10 +31,11 @@ def test_las_listas_se_convierten_en_vinetas() -> None:
     assert secciones[0].lineas == ["• Primero", "• Segundo"]
 
 
-def test_las_listas_numeradas_tambien() -> None:
+def test_las_listas_numeradas_conservan_el_numero() -> None:
+    """En una lista numerada el número significa algo: no se convierte en viñeta."""
     markdown = "## Apartado\n\n1. Primero\n2. Segundo\n"
     secciones = a_secciones(markdown)
-    assert secciones[0].lineas == ["• Primero", "• Segundo"]
+    assert secciones[0].lineas == ["1. Primero", "2. Segundo"]
 
 
 def test_las_tablas_se_convierten_en_filas_con_tabuladores() -> None:

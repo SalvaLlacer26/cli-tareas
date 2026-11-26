@@ -16,6 +16,7 @@ from tareas.errores import ErrorIA
 from tareas.ia import (
     MODELO_POR_DEFECTO,
     ConfiguracionIA,
+    ProveedorIA,
     _endpoint,
     _extraer_texto,
     configuracion,
@@ -90,6 +91,24 @@ def test_con_clave_pero_sin_url_el_motivo_es_el_url() -> None:
 def test_el_modelo_por_defecto_se_pone_si_no_se_indica() -> None:
     config = ConfiguracionIA(url="https://x/v1", clave="k")
     assert config.modelo == MODELO_POR_DEFECTO
+
+
+# --------------------------------------------------------- el proveedor
+
+
+def test_el_proveedor_nace_de_la_configuracion() -> None:
+    """La fábrica lee variables y .env: sin nada, dice que no está disponible."""
+    proveedor = ProveedorIA.desde_configuracion()
+    assert proveedor.disponible is False
+    assert "TAREAS_IA_URL" in proveedor.motivo_de_no_disponible()
+
+
+def test_el_proveedor_con_url_y_clave_esta_disponible(monkeypatch) -> None:
+    monkeypatch.setenv("TAREAS_IA_URL", "https://modelos.ies/v1")
+    monkeypatch.setenv("TAREAS_IA_KEY", "clave-de-prueba")
+    proveedor = ProveedorIA.desde_configuracion()
+    assert proveedor.disponible is True
+    assert proveedor.motivo_de_no_disponible() == ""
 
 
 # ----------------------------------------------------------- la URL

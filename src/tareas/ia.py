@@ -151,6 +151,49 @@ def motivo_de_no_disponible() -> str:
     return ""
 
 
+class ProveedorIA:
+    """El proveedor de modelos: la puerta única hacia el servidor.
+
+    Resume y ejercicios hablan con el proveedor, y solo el proveedor habla
+    con el HTTP. La fábrica ``desde_configuracion`` lee las variables de
+    entorno y los .env y monta el proveedor con lo que haya: si no hay clave
+    o dirección, el proveedor existe pero dice que no está disponible, y la
+    CLI sigue con las versiones sin IA.
+    """
+
+    def __init__(self, config: ConfiguracionIA) -> None:
+        assert config is not None, "un proveedor necesita su configuración"
+        self.config = config
+
+    @staticmethod
+    def desde_configuracion() -> "ProveedorIA":
+        """Fábrica: el proveedor con la configuración de variables y .env."""
+        return ProveedorIA(configuracion())
+
+    @property
+    def disponible(self) -> bool:
+        """Si se puede usar el modelo ahora mismo."""
+        return bool(self.config.url and self.config.clave)
+
+    def motivo_de_no_disponible(self) -> str:
+        """Por qué no se puede usar el modelo, en una línea."""
+        if not self.config.url:
+            return f"falta la variable {VAR_URL} (la dirección del servidor de modelos)"
+        if not self.config.clave:
+            return f"falta la variable {VAR_CLAVE} (la clave del modelo)"
+        return ""
+
+    def pedir(self, sistema: str, usuario: str, temperatura: float = 0.3) -> str:
+        """Una respuesta del modelo, con la configuración de este proveedor."""
+        return pedir(sistema, usuario, temperatura=temperatura)
+
+    def pedir_con_busqueda(
+        self, sistema: str, usuario: str, maximo_consultas: int = 3
+    ) -> tuple[str, list[Fuente]]:
+        """Una respuesta del modelo, haciendo las búsquedas que pida."""
+        return pedir_con_busqueda(sistema, usuario, maximo_consultas)
+
+
 def _contexto_ssl(config: ConfiguracionIA) -> ssl.SSLContext:
     """El contexto SSL, con el certificado del centro si hace falta."""
     if not config.ca:

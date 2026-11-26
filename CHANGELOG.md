@@ -6,6 +6,53 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 
 ## [No publicado]
 
+## [v2.2.3] — 2026-11-09
+
+Los documentos generados van presentados como un trabajo de verdad, y la
+CLI suma los comandos de referencia del curso: `version`, `listar` y
+`acciones`.
+
+### Añadido
+
+- **Comandos `tareas version`, `tareas listar` y `tareas acciones`.** La
+  versión instalada; el contenido de una carpeta (nombre, tipo, tamaño y
+  fecha, con `--json` limpio para tuberías); y las acciones del fichero de
+  configuración con su tipo, su descripción y si piden confirmación.
+- **`ProveedorIA`: la puerta única al modelo.** Una fachada con fábrica
+  (`desde_configuracion`) que lee variables y `.env`: si no hay clave o
+  dirección, dice que no está disponible y la CLI lo enseña en el aviso de
+  `resumir` y `evaluar`.
+- **Los documentos generados van presentados**: los apartados se numeran
+  («1.», «1.1»…), el índice queda enlazado con cada apartado (en .odt y
+  .docx se puede pinchar para saltar), el encabezado lleva la unidad a la
+  izquierda y la asignatura a la derecha, y el pie lleva el número de
+  página. Los cuatro formatos (ODT, DOCX, RTF y TXT) se presentan igual.
+- **Las listas numeradas conservan su número**: el orden de un ejercicio o
+  de unos pasos era información, y se convertía en viñetas.
+- **Encabezado y pie también en RTF** (WordPad/Word) con número de página.
+
+### Corregido
+
+- **Separación entre párrafos y títulos.** El texto corrido quedaba pegado
+  al título del apartado siguiente; ahora la separación la ponen los estilos
+  del documento (márgenes en ODT, `spacing` en DOCX, `\sa`/`\sb` en RTF).
+- **El RTF se veía de churro en Windows.** Se guardaba en UTF-8 declarando
+  cp1252; ahora las tildes y símbolos van escapados con su código RTF.
+- **`resumir` y `evaluar` ya no parecen colgados.** Consultar al modelo tarda
+  minutos (y más si pide búsquedas en internet), pero la terminal no mostraba
+  nada y la herramienta parecía no funcionar. Ahora hay un indicador de
+  progreso que avisa de que se está consultando al modelo y de que puede
+  tardar unos minutos.
+
+## [v2.2.2] — 2026-11-05
+
+### Corregido
+
+- **Elige la fuente más general cuando dos títulos encajan igual.** Buscar
+  «bases de datos» podía devolver «Base de datos jerárquica» antes que
+  «Base de datos»: el artículo general explica mejor el tema, así que entre
+  dos títulos con las mismas coincidencias gana el más corto.
+
 ## [v2.2.1] — 2026-11-04
 
 Arreglo de `tareas resumir`: el documento se quedaba con una línea

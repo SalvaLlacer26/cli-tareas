@@ -21,6 +21,9 @@ RE_SEPARADOR = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 #: Un elemento de lista: «- », «* », «+ » o «1. ».
 RE_LISTA = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(.*)$")
 
+#: Una lista numerada: el número se conserva en el documento final.
+RE_LISTA_NUMERADA = re.compile(r"^\s*(\d+)[.)]\s+")
+
 #: Un encabezado de Markdown: dos o tres almohadillas.
 RE_ENCABEZADO = re.compile(r"^(#{1,6})\s+(.*)$")
 
@@ -107,7 +110,14 @@ def a_secciones(markdown: str, titulo: str = "") -> list[Seccion]:
         if lista:
             if actual is None:
                 actual = Seccion(titulo=titulo or titulo_principal or "Contenido", lineas=[])
-            actual.lineas.append(f"• {limpiar_texto(lista.group(1))}")
+            numerada = RE_LISTA_NUMERADA.match(linea)
+            if numerada:
+                # En una lista numerada el número significa algo (orden,
+                # pasos de un ejercicio): se conserva.
+                marca = f"{numerada.group(1)}."
+            else:
+                marca = "•"
+            actual.lineas.append(f"{marca} {limpiar_texto(lista.group(1))}")
             continue
 
         # ----------------------------------------------- párrafo

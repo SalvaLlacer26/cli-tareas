@@ -33,6 +33,32 @@ class FichaComando:
 
 COMANDOS: list[FichaComando] = [
     FichaComando(
+        nombre="version",
+        uso="tareas version",
+        para_que="Muestra la versión instalada de la herramienta.",
+        ejemplo="tareas version",
+    ),
+    FichaComando(
+        nombre="listar",
+        uso="tareas listar [CARPETA] [--json]",
+        para_que=(
+            "Lista los ficheros de una carpeta con su nombre, tipo, tamaño y fecha "
+            "de modificación. Con --json la salida es JSON limpio, sin colores, "
+            "para tuberías y otros programas."
+        ),
+        ejemplo="tareas listar ~/Descargas --json",
+    ),
+    FichaComando(
+        nombre="acciones",
+        uso="tareas acciones",
+        para_que=(
+            "Lista las acciones definidas en el fichero de configuración con su "
+            "tipo, si piden confirmación y su descripción, más las carpetas "
+            "(asignaturas) declaradas."
+        ),
+        ejemplo="tareas acciones",
+    ),
+    FichaComando(
         nombre="analizar",
         uso="tareas analizar [CARPETA]",
         para_que=(
