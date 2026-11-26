@@ -296,6 +296,28 @@
     }
   ],
   "organizador": {
-    "descargas": "/home/salllaiva/pruebas-tareas/Descargas"
+    "descargas": "/home/salllaiva/pruebas-tareas/Descargas",
+    "documentos": [
+      ".pdf",
+      ".docx",
+      ".doc",
+      ".odt",
+      ".odp",
+      ".ods",
+      ".odb",
+      ".pptx",
+      ".ppt",
+      ".txt",
+      ".md",
+      ".rtf",
+      ".epub",
+      ".html",
+      ".htm",
+      ".xml",
+      ".csv",
+      ".fodt",
+      ".fodp",
+      ".sxw"
+    ]
   }
 }
