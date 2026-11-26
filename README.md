@@ -340,6 +340,7 @@ cli-tareas/
 ├── acciones.json           # la configuración: asignaturas y acciones
 ├── docs/
 │   ├── spec.md                             # la spec de 10 líneas (para quién, qué hará y qué NO)
+│   ├── rubrica.md                          # correspondencia criterio-por-criterio con archivos y tests
 │   ├── adr/0001-configuracion-externa.md   # por qué las acciones van fuera del código
 │   ├── adr/0002-capa-ia-modo-sin-red.md     # por qué la IA es una capa con modo sin red
 │   └── prompts.md
@@ -372,7 +373,7 @@ cli-tareas/
 │   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)
 │   ├── motor.py            # el motor de las acciones genéricas
 │   └── errores.py          # TareasError, ConfigError, AccionNoValida
-└── tests/                  # 194 pruebas (pytest + CI en Linux, Windows y macOS)
+└── tests/                  # 195 pruebas (pytest + CI en Linux, Windows y macOS)
 ```
 
 ## Multiplataforma
@@ -406,6 +407,9 @@ cli-tareas/
   su commit con mensaje que cuenta qué y por qué.
 - **Releases etiquetadas.** Cada versión va con su *tag* anotado (`git tag -a`) y
   su entrada en `CHANGELOG.md` (formato *Keep a Changelog*, versionado semántico).
-  La última release es la etiqueta `v2.6.0`.
+  La última release es la etiqueta `v2.7.0`.
 - **Calidad continua.** `pytest` en tres sistemas (Linux, Windows, macOS) en cada
   *push* vía GitHub Actions (`.github/workflows/pruebas.yml`).
+- **Correspondencia con la rúbrica del curso.** `docs/rubrica.md` mapea criterio
+  por criterio (nivel *Excelente · 100 %*) contra archivos concretos y pruebas
+  concretas, con la orden de verificación para cada apartado.

@@ -4,15 +4,44 @@ Todas las novedades de `tareas` van aquí. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto usa
 [versiones semánticas](https://semver.org/lang/es/).
 
-## [No publicado]
+## [v2.7.0] — 2026-11-26
+
+La CLI enseña los pasos exactos para activar la IA cuando un comando con IA
+se lanza sin configuración, y el proyecto se auto-documenta contra la rúbrica
+del curso. Release orientada a que **otra persona** (un profesor, un
+compañero) pueda clonar el repo, instalarlo y poner la IA en marcha sin
+preguntar nada.
+
+### Añadido
+
+- **Panel de activación de la IA.** Cuando falta la configuración, las
+  órdenes con IA (`resumir`, `evaluar`, `clasificar`, `formulario_evaluar`)
+  muestran un bloque numerado con los tres pasos (copiar `.env.example`,
+  pegar la clave, ajustar la ruta del certificado CA) y la URL del centro,
+  **antes** de caer al modo sin red. El modo sin red sigue funcionando igual:
+  no se rompe nada, solo se explica mejor qué hacer.
+- **`docs/rubrica.md`.** Correspondencia criterio-por-criterio (nivel
+  *Excelente · 100 %*) con archivos concretos, tests y órdenes para
+  verificarlo en cinco segundos. Escrito pensando en el corrector.
 
 ### Cambiado
 
-- **Proceso y documentación al día (criterio de release).** Añadida `docs/spec.md`
-  (la especificación de 10 líneas que abre el ciclo), el README enlaza ya spec,
-  ADRs, releases etiquetadas y el flujo por ramas (`merge --no-ff`), y se corrige
-  el recuento de pruebas del árbol. El trabajo por ramas queda reflejado en el
-  grafo de `git log`.
+- **`.env.example` reescrito.** Bloque de instrucciones al principio,
+  ejemplo con Ollama al final; se puede seguir de arriba abajo sin leer el
+  README.
+- README enlaza la rúbrica (`docs/rubrica.md`) y refleja el aviso de la IA.
+- **Proceso y documentación al día (criterio de release).** Añadida
+  `docs/spec.md` (la especificación de 10 líneas que abre el ciclo), el
+  README enlaza ya spec, ADRs, releases etiquetadas y el flujo por ramas
+  (`merge --no-ff`). El trabajo por ramas queda reflejado en el grafo de
+  `git log`.
+- **`pyproject.toml` sincronizado con `__version__`.** La metadatos de
+  instalación (vista por `uv tool list`) vuelven a coincidir con la versión
+  que muestra `tareas version`.
+- **Historial reorganizado con ramas.** Todos los cambios por *feature
+  branches* integradas con `git merge --no-ff`; el grafo (`git log --graph`)
+  muestra 18+ merges con nombres descriptivos (`feat/…`, `fix/…`,
+  `docs/…`, `chore/…`, `ci/…`).
 
 ## [v2.6.0] — 2026-11-23
 
@@ -504,6 +533,6 @@ una traza de Python.
 - `destino_libre` no escribe a través de un enlace simbólico roto.
 - Los nombres que genera `renombrar` se validan contra las reglas de Windows.
 
-[No publicado]: https://github.com/SalvaLlacer26/cli-tareas/compare/v1.0.0...HEAD
+[v2.7.0]: https://github.com/SalvaLlacer26/cli-tareas/compare/v2.6.0...v2.7.0
 [v1.0.0]: https://github.com/SalvaLlacer26/cli-tareas/releases/tag/v1.0.0
 
