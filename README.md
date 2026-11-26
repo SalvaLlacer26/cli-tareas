@@ -146,16 +146,21 @@ ZIP con el XML dentro), así que no hace falta instalar nada para escribirlos.
 
 #### Configurar el modelo
 
-La clave **nunca** va en el repo. Se copia el fichero de ejemplo y se rellena:
+La clave **nunca** va en el repo. Los tres pasos para activar la IA:
 
 ```bash
 cp .env.example .env
+# edita .env: pega la clave que te da el profesor y ajusta la ruta del CA
+uv run tareas resumir algun_documento.pdf   # si no hay IA, la propia CLI te dice qué falta
 ```
+
+El `.env` mínimo del centro tiene estas cuatro variables (el `.env.example`
+viene ya comentado línea a línea):
 
 ```bash
 TAREAS_IA_URL=https://ia.simarro/llmapi/v1
 TAREAS_IA_KEY=la-clave-del-profesor
-TAREAS_MODELO=Qwen38-DualSpark-low
+TAREAS_MODELO=Qwen38-DualSpark-medium
 TAREAS_IA_CA=~/.config/opencode/ca-simarro.crt
 ```
 
@@ -223,11 +228,14 @@ clasificar»**, que la CLI te enseña en la consola para que la revises.
 #### Sin red o sin clave
 
 Si no hay modelo (no hay clave, no hay red, el servidor falla), la CLI **no se
-rompe**: lo explica en una línea. Como sin IA no se pueden escribir apuntes
-desde cero, `resumir` guarda una extracción del documento con las fuentes que ha
+rompe**: enseña un panel con **los pasos exactos para activar la IA** (copiar
+`.env.example`, pegar la clave, poner la ruta del certificado) y **sigue** con
+la versión sin IA de la orden. Como sin IA no se pueden escribir apuntes desde
+cero, `resumir` guarda una extracción del documento con las fuentes que ha
 podido buscar, y el documento lleva una nota que dice claro que **no son los
-apuntes**, para que nadie se studye algo que no es. `evaluar` hace lo propio con
-su versión extractiva.
+apuntes**, para que nadie se estudie algo que no es. `evaluar` hace lo propio
+con su versión extractiva, `clasificar` lo mete todo en «Por clasificar» y
+`formulario_evaluar` monta un examen sencillo sacado del propio documento.
 
 #### En la terminal
 
