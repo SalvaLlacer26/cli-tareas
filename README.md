@@ -47,10 +47,11 @@ cp acciones.json ~/.config/tareas/acciones.json
 | `tareas acciones` | Lista las acciones del fichero de configuración con su tipo, si piden confirmación y su descripción, más las carpetas (asignaturas). |
 | `tareas analizar [CARPETA]` | Analiza la carpeta y el contenido de cada fichero, renombra los que tienen nombres incompatibles y escribe una ficha `.md` por documento con los datos para clasificarlo. Muestra una tabla con la asignatura de cada fichero y pide que confirmes el análisis. |
 | `tareas organizar [CARPETA]` | Mueve cada documento a la carpeta de su asignatura usando las fichas, y le devuelve el nombre original. Muestra un resumen. |
-| `tareas deshacer [CARPETA]` | Deshace lo anterior: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
+| `tareas deshacer [CARPETA]` | Deshace lo hecho por `organizar` y por `clasificar`: devuelve los documentos a su carpeta de origen con su nombre original. Las fichas se conservan. |
 | `tareas resumir 'ARCHIVO' [CARPETA]` | Crea un resumen del archivo (10 páginas como máximo, sin imágenes, organizado en apartados) en la carpeta `resumenes`, con el nombre `ARCHIVO_resumido`. |
-| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea una batería de ejercicios en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. La IA decide la mezcla de tipos según el tema. |
-| `tareas clasificar [CARPETA] --destino RUTA` | Crea en `RUTA` un grupo de carpetas **decidido por la IA** según el contenido de los documentos, y mueve cada documento dentro. |
+| `tareas evaluar 'ARCHIVO' [CARPETA]` | Crea una batería de ejercicios (mínimo 10 preguntas) en la carpeta `ejercicios`, con el nombre `ARCHIVO_test`. La IA decide la mezcla de tipos y cada ejecución genera un examen distinto. |
+| `tareas formulario_evaluar 'ARCHIVO' [CARPETA]` | **(En pruebas)** El mismo examen en un formulario HTML que abre en el navegador: tipo test con botones y preguntas escritas con su hueco. Al enviar, corrige en `127.0.0.1` y la IA revisa lo escrito. Se cierra con Enter. |
+| `tareas clasificar [CARPETA] --destino RUTA` | Crea en `RUTA` un grupo de carpetas **decidido por la IA** según el contenido, y mueve cada documento dentro. Coloca todos los ficheros (también fotos e instaladores, por su nombre y tipo); lo que no se pueda clasificar va a «Por clasificar». |
 | `tareas comandos` | Lista todos los comandos, cómo se usan y para qué sirven. |
 | `tareas validar` | Comprueba el fichero de configuración y dice qué campo falla. |
 | `tareas ejecutar NOMBRE [CARPETA]` | Ejecuta una de las acciones del fichero de configuración. |
@@ -193,6 +194,29 @@ Además, si ya hiciste `tareas resumir` de ese documento, ese resumen (que
 puede llevar información completada con internet) se usa como contexto para
 preguntar: el resultado es mucho mejor.
 
+#### `formulario_evaluar`: el examen en el navegador (en pruebas)
+
+`tareas formulario_evaluar 'ARCHIVO'` prepara los mismos ejercicios, pero en un
+formulario HTML que se abre en el navegador: el tipo test con botones de
+opción y las preguntas de desarrollo y cálculo con su hueco para escribir.
+Le das a **Enviar respuestas** y aparece la corrección: el tipo test se
+compara en local, y las preguntas escritas las corrige la IA con sus pautas.
+
+El examen se sirve en `http://127.0.0.1`, solo en tu equipo: el formulario no
+se expone a la red y **la clave del modelo no sale del `.env`** (quien llama a
+la IA es la CLI, no el navegador). Pulsa Enter en la terminal para cerrarlo.
+Si no hay modelo, prepara una batería sencilla sacada del propio texto y no
+autocorrige lo escrito.
+
+#### `clasificar` no deja ningún documento atrás
+
+Un PDF se agrupa por su contenido; una foto o un instalador no tienen texto
+que leer. Por eso `clasificar` le enseña al modelo **todos** los ficheros, y de
+los que no tienen texto le da una pista con el nombre y el tipo. Lo que el
+modelo no coloque en la primera tanda se le vuelve a preguntar una segunda vez,
+ya con las carpetas creadas. Lo que siga sin sitio va a una carpeta **«Por
+clasificar»**, que la CLI te enseña en la consola para que la revises.
+
 #### Sin red o sin clave
 
 Si no hay modelo (no hay clave, no hay red, el servidor falla), la CLI **no
@@ -200,6 +224,15 @@ se rompe**: lo explica en una línea y genera la versión extractiva, que corta
 las primeras 25 líneas de cada apartado. El documento lleva una nota dizendo
 que se ha hecho sin IA, para que nadie se tome por bueno un resumen que no lo
 es.
+
+#### En la terminal
+
+Todas las órdenes enseñan un indicador mientras trabajan, para que no parezca
+que se han colgado (algunas, como `resumir` o `clasificar`, tardan de verdad).
+Y al terminar, si estás en una terminal de verdad, la herramienta te pregunta
+**«¿Qué quieres hacer ahora?»** y te sugiere los pasos que tienen sentido a
+continuación. En un guion o una tubería (`tareas listar --json | ...`) ese
+cierre no aparece: la salida se mantiene limpia.
 
 #### Privacidad
 
@@ -290,7 +323,8 @@ cli-tareas/
 ├── .gitattributes          # * text=auto
 ├── acciones.json           # la configuración: asignaturas y acciones
 ├── docs/
-│   ├── adr/0001-configuracion-externa.md
+│   ├── adr/0001-configuracion-externa.md   # por qué las acciones van fuera del código
+│   ├── adr/0002-capa-ia-modo-sin-red.md     # por qué la IA es una capa con modo sin red
 │   └── prompts.md
 ├── opencode.json           # permisos de mi agente
 ├── AGENTS.md               # normas del proyecto para el agente
@@ -317,6 +351,7 @@ cli-tareas/
 │   ├── agrupador.py        # el comando «clasificar»: carpetas decididas por la IA
 │   ├── resumen.py          # el resumen
 │   ├── evaluacion.py       # los ejercicios
+│   ├── examenes.py         # formulario_evaluar: examen interactivo en el navegador
 │   ├── acciones.py         # clases Accion (mover, copiar, renombrar, borrar)
 │   ├── motor.py            # el motor de las acciones genéricas
 │   └── errores.py          # TareasError, ConfigError, AccionNoValida

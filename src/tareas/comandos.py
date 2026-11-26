@@ -157,6 +157,19 @@ COMANDOS: list[FichaComando] = [
         ejemplo="tareas clasificar --destino ~/Documents/MisTemas",
     ),
     FichaComando(
+        nombre="formulario_evaluar",
+        uso="tareas formulario_evaluar 'NOMBRE_DE_ARCHIVO' [CARPETA] [--no-abrir]",
+        para_que=(
+            "EN PRUEBAS. Prepara los mismos ejercicios que «evaluar», pero en "
+            "un formulario HTML que abre en el navegador: tipo test con botones "
+            "de opción, desarrollo y cálculo con hueco para escribir, y botón "
+            "de enviar. Al enviar, corrige el tipo test en local y la IA "
+            "corrige lo escrito. El servidor solo escucha en tu propio equipo. "
+            "Pulsa Enter en la terminal para cerrar el examen."
+        ),
+        ejemplo="tareas formulario_evaluar 'A21_IntroduccióGit_GitHub.pdf'",
+    ),
+    FichaComando(
         nombre="comandos",
         uso="tareas comandos",
         para_que=(
@@ -166,3 +179,59 @@ COMANDOS: list[FichaComando] = [
         ejemplo="tareas comandos",
     ),
 ]
+
+#: Qué se le sugiere a quien acaba de terminar cada comando: la herramienta
+#: se cuenta sola con un «¿Qué quieres hacer ahora?» al final de cada orden.
+#: Una línea corta por sugerencia. «comandos» nunca se sugiere aquí: se ofrece
+#: aparte, al final del bloque, como ayuda detallada.
+SIGUIENTES: dict[str, list[tuple[str, str]]] = {
+    "analizar": [
+        ("organizar", "a colocar cada documento"),
+        ("clasificar", "a agrupar por contenido"),
+        ("resumir", "de un documento ya analizado"),
+    ],
+    "organizar": [
+        ("resumir", "de lo recién colocado"),
+        ("evaluar", "de cualquier documento"),
+        ("deshacer", "devolver todo a su sitio"),
+    ],
+    "deshacer": [
+        ("organizar", "volver a colocar"),
+        ("analizar", "con otros criterios"),
+    ],
+    "resumir": [
+        ("evaluar", "con el resumen de contexto"),
+        ("formulario_evaluar", "el examen en el navegador"),
+    ],
+    "evaluar": [
+        ("formulario_evaluar", "el mismo examen, interactivo"),
+    ],
+    "formulario_evaluar": [
+        ("resumir", "y el documento en papel"),
+    ],
+    "clasificar": [
+        ("resumir", "de lo ya agrupado"),
+        ("evaluar", "de un documento con ficha"),
+        ("deshacer", "devolver lo clasificado"),
+    ],
+    "validar": [
+        ("acciones", "ver las acciones configuradas"),
+        ("ejecutar", "una acción, con --simular"),
+    ],
+    "ejecutar": [
+        ("listar", "ver cómo ha quedado"),
+        ("deshacer", "si algo no te convence"),
+    ],
+    "listar": [
+        ("analizar", "esa carpeta"),
+    ],
+    "acciones": [
+        ("ejecutar", "una, probando con --simular"),
+    ],
+    "version": [
+        ("analizar", "empezar a organizar"),
+    ],
+    "comandos": [
+        ("analizar", "el primer paso del ciclo"),
+    ],
+}

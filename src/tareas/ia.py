@@ -188,10 +188,10 @@ class ProveedorIA:
         return pedir(sistema, usuario, temperatura=temperatura)
 
     def pedir_con_busqueda(
-        self, sistema: str, usuario: str, maximo_consultas: int = 3
+        self, sistema: str, usuario: str, maximo_consultas: int = 3, temperatura: float = 0.3
     ) -> tuple[str, list[Fuente]]:
         """Una respuesta del modelo, haciendo las búsquedas que pida."""
-        return pedir_con_busqueda(sistema, usuario, maximo_consultas)
+        return pedir_con_busqueda(sistema, usuario, maximo_consultas, temperatura)
 
 
 def _contexto_ssl(config: ConfiguracionIA) -> ssl.SSLContext:
@@ -305,6 +305,7 @@ def pedir_con_busqueda(
     sistema: str,
     usuario: str,
     maximo_consultas: int = 3,
+    temperatura: float = 0.3,
 ) -> tuple[str, list[Fuente]]:
     """Le pide una respuesta al modelo y, si lo pide, busca en internet.
 
@@ -316,6 +317,10 @@ def pedir_con_busqueda(
     y termina su turno. Entonces se busca la consulta, se le pasan los
     resultados y se le vuelve a preguntar. Así el modelo decide **él
     mismo** si el documento es demasiado escueto y hay que completarlo.
+
+    Con una temperatura alta el modelo se despega más del texto y responde de
+    forma distinta a cada pasada; sirve para que dos exámenes del mismo tema
+    no salgan clonados.
 
     Devuelve la respuesta final (sin marcas de búsqueda) y las fuentes que se
     han usado.
@@ -331,7 +336,7 @@ def pedir_con_busqueda(
     respuesta = ""
 
     for _ in range(maximo_consultas + 1):
-        respuesta = pedir_con_historial(sistema, mensajes)
+        respuesta = pedir_con_historial(sistema, mensajes, temperatura=temperatura)
         consultas = buscar_en_la_respuesta(respuesta)
 
         if not consultas:
@@ -413,7 +418,7 @@ def pedir_con_historial(
         "model": config.modelo,
         "messages": mensajes,
         "max_tokens": TOKENS_MAXIMOS,
-        "temperature": 0.3,
+        "temperature": temperatura,
     }
 
     peticion = urllib.request.Request(

@@ -63,22 +63,29 @@ def _buscar_fichas(carpeta: Path, carpetas: list | None = None) -> list[Path]:
     asignatura, que es hermana de la carpeta de origen y no está dentro de
     ella. Por eso se buscan también en las carpetas de destino que declara la
     configuración: así «deshacer» funciona se ejecute desde donde se ejecute.
+
+    Y después de «clasificar», cada documento queda con su ficha en la
+    subcarpeta «md» de la carpeta recién creada. Para cubrirlo, se recorren
+    todas las carpetas «md» que hay debajo (con `rglob`), no solo la inmediata.
     """
-    candidatas: list[Path] = [carpeta]
-    candidatas += sorted(
-        (d for d in carpeta.rglob(CARPETA_FICHAS) if d.is_dir()), key=lambda p: str(p)
-    )
+    #: Carpetas que se recorren buscando los .md, sin el «md» final añadido.
+    directorios: list[Path] = [carpeta / CARPETA_FICHAS]
+
+    #: Y las «md» anidadas por debajo (las que crea «clasificar») y las de las
+    #: asignaturas declaradas en la configuración, con sus propias anidadas.
+    bases: list[Path] = [carpeta]
     for definicion in carpetas or []:
-        candidatas.append(definicion.destino)
-        candidatas += sorted(
-            (d for d in definicion.destino.rglob(CARPETA_FICHAS) if d.is_dir()),
-            key=lambda p: str(p),
+        bases.append(definicion.destino)
+    for base in bases:
+        if not base.is_dir():
+            continue
+        directorios += sorted(
+            (d for d in base.rglob(CARPETA_FICHAS) if d.is_dir()), key=lambda p: str(p)
         )
 
     encontradas: list[Path] = []
     vistos: set[Path] = set()
-    for base in candidatas:
-        directorio = base / CARPETA_FICHAS
+    for directorio in directorios:
         if directorio in vistos or not directorio.is_dir():
             continue
         vistos.add(directorio)

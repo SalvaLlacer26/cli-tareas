@@ -11,7 +11,9 @@ dice.
 
 from __future__ import annotations
 
+import random
 import re
+from dataclasses import replace
 from pathlib import Path
 
 from .documentos import Seccion, escribir_documento
@@ -21,6 +23,23 @@ from .markdown import a_secciones
 
 #: Máximo de preguntas de cada tipo en la versión extractiva.
 MAXIMO_POR_TIPO = 6
+
+#: Mínimo de preguntas que se piden a la batería: un examen corto no evalúa.
+MINIMO_PREGUNTAS = 10
+
+#: Un examen sienta mejor si cada vez sale distinto: temperatura alta para que
+#: el modelo se mueva y no repita el mismo enunciado en dos pasadas.
+TEMPERATURA_EXAMEN = 0.8
+
+#: Enfoques que se le pueden pedir al modelo, para que varíe cada examen.
+ENFOQUES = (
+    "pregunta sobre todo conceptos y definiciones",
+    "pregunta sobre todo la aplicación práctica de lo que se explica",
+    "pone el acento en comparar y relacionar ideas del tema",
+    "plantea casos y ejemplos numéricos sacados del contenido",
+    "insiste en los errores típicos y en el porqué de cada cosa",
+    "pregunta de forma directa, con enunciados cortos y concretos",
+)
 
 #: Palabras que suelen anunciar una definición.
 MARCAS_DE_DEFINICION = (
@@ -108,6 +127,7 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
     secciones: list[Seccion] = []
 
     definiciones = _definiciones(texto)
+    random.shuffle(definiciones)  # cada pasada, un examen algo distinto
     lineas_test: list[str] = []
     for numero, definicion in enumerate(definiciones[:MAXIMO_POR_TIPO], start=1):
         contexto = _contexto(texto, definicion)
@@ -126,6 +146,7 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
         secciones.append(Seccion("Tipo test", lineas_test))
 
     apartados = _apartados(texto)
+    random.shuffle(apartados)
     lineas_desarrollo: list[str] = []
     for numero, apartado in enumerate(apartados[:MAXIMO_POR_TIPO], start=1):
         lineas_desarrollo.append(
@@ -140,6 +161,7 @@ def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
         secciones.append(Seccion("Preguntas de desarrollo", lineas_desarrollo))
 
     calculos = [l.strip() for l in texto.splitlines() if RE_FORMULA.search(l) and len(l.strip()) > 12]
+    random.shuffle(calculos)
     lineas_calculo: list[str] = []
     for numero, calculo in enumerate(calculos[:MAXIMO_POR_TIPO], start=1):
         lineas_calculo.append(
@@ -200,7 +222,24 @@ def resumen_previo(carpeta: Path, nombre: str) -> str:
     return ""
 
 
-def pedir_ejercicios(ficha: Ficha, contexto_extra: str = "") -> tuple[list[Seccion], list[Fuente]]:
+def _variacion() -> str:
+    """Una consigna al azar, para que dos exámenes del mismo tema no se parezcan.
+
+    Se le echa a la petición de cada ejecución: cambia el foco y el número de
+    preguntas, de modo que la batería salga siempre distinta.
+    """
+    enfoque = random.choice(ENFOQUES)
+    extra = random.randint(0, 4)
+    return (
+        f"Enfoque de ESTE examen (distinto al de otras veces): {enfoque}. "
+        f"Redondea la batería hasta {MINIMO_PREGUNTAS + extra} preguntas en total, "
+        f"si el documento da para tanto."
+    )
+
+
+def pedir_ejercicios(
+    ficha: Ficha, contexto_extra: str = ""
+) -> tuple[list[Seccion], list[Fuente]]:
     """Le pide al modelo una batería de ejercicios y la convierte en secciones."""
     from .ia import pedir_con_busqueda
 
@@ -210,6 +249,7 @@ def pedir_ejercicios(ficha: Ficha, contexto_extra: str = "") -> tuple[list[Secci
 
     peticion = (
         f"Prepara una batería de ejercicios sobre este documento de apuntes.\n\n"
+        f"{_variacion()}\n\n"
         f"Primero entiende de qué va el documento: no todos los temas admiten el "
         f"mismo tipo de ejercicio. Un tema de teoría (definiciones, conceptos, "
         f"historia, terminología) NO debe llevar ejercicios de cálculo; un tema de "
@@ -221,10 +261,17 @@ def pedir_ejercicios(ficha: Ficha, contexto_extra: str = "") -> tuple[list[Secci
         f"«Preguntas de desarrollo» y «Cálculo y problemas». Incluye solo los que "
         f"tengan sentido para este documento y explica cuáles has dejado fuera.\n"
         f"- En el tipo test, cada pregunta tiene CUATRO alternativas reales (no "
-        f"líneas de puntos), una sola correcta, y la respuesta correcta marcada al "
-        f"final de la pregunta entre corchetes, por ejemplo [b)].\n"
-        f"- Entre 5 y 8 preguntas de tipo test, entre 3 y 5 de desarrollo y entre "
-        f"2 y 4 de cálculo, según lo que dé el documento.\n"
+        f"líneas de puntos) y una sola correcta. NO escribas la respuesta "
+        f"correcta junto a la pregunta ni detrás de las alternativas: las "
+        f"respuestas van ÚNICAMENTE en el apartado «Soluciones», al final del "
+        f"documento.\n"
+        f"- MÍNIMO {MINIMO_PREGUNTAS} preguntas en total. Reparte entre «Entre 5 y 8» "
+        f"de tipo test, «3 a 6» de desarrollo y «2 a 5» de cálculo; si el tema no "
+        f"da para las tres clases, echa más de las que sí tenga sentido, pero sin "
+        f"bajar de {MINIMO_PREGUNTAS} entre todas.\n"
+        f"- Separa cada pregunta de la siguiente con una línea en blanco, y deja "
+        f"las cuatro alternativas de cada pregunta de tipo test sin línea en blanco "
+        f"entre ellas (forman un solo bloque).\n"
         f"- Las preguntas de desarrollo y de cálculo llevan espacio para responder "
         f"y el enunciado completo.\n"
         f"- Al final, un apartado «## Soluciones» con la solución de cada pregunta "
@@ -250,11 +297,36 @@ def pedir_ejercicios(ficha: Ficha, contexto_extra: str = "") -> tuple[list[Secci
         f"--- DOCUMENTO ---\n{contenido}"
     )
 
-    respuesta, fuentes = pedir_con_busqueda(SISTEMA, peticion)
+    respuesta, fuentes = pedir_con_busqueda(
+        SISTEMA, peticion, temperatura=TEMPERATURA_EXAMEN
+    )
     secciones = a_secciones(respuesta, titulo="Ejercicios")
     if not secciones or not any(s.lineas for s in secciones):
         raise ErrorIA("el modelo ha contestado pero sin contenido")
     return secciones, fuentes
+
+
+#: Una línea que abre pregunta: «1. …», «2) …».
+RE_PREGUNTA = re.compile(r"^\s*\d+[.)]\s")
+
+
+def separar_preguntas(secciones: list[Seccion]) -> list[Seccion]:
+    """Deja una línea en blanco antes de cada pregunta.
+
+    Así la última frase de una pregunta no queda pegada a la siguiente: entre
+    un bloque y otro hay una línea en blanco, que todos los formatos (ODT,
+    DOCX, RTF y TXT) pintan como un salto de párrafo.
+    """
+    separadas: list[Seccion] = []
+    for seccion in secciones:
+        nueva: list[str] = []
+        for linea in seccion.lineas:
+            es_pregunta = RE_PREGUNTA.match(linea) is not None
+            if es_pregunta and nueva and nueva[-1] != "":
+                nueva.append("")
+            nueva.append(linea)
+        separadas.append(replace(seccion, lineas=nueva))
+    return separadas
 
 
 def construir_secciones(
@@ -291,7 +363,7 @@ def escribir_evaluacion(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
     contexto = resumen_previo(Path(carpeta), ficha.nombre_original)
     secciones, nota, fuentes = construir_secciones(ficha, con_ia=True, contexto_extra=contexto)
     titulo = f"Ejercicios · {ficha.nombre_original}"
-    bloques = [Seccion("", [nota], nivel=1), *secciones]
+    bloques = [Seccion("", [nota], nivel=1), *separar_preguntas(secciones)]
 
     if fuentes:
         lineas = [f"• {fuente.titulo} — {fuente.url}" for fuente in fuentes]
