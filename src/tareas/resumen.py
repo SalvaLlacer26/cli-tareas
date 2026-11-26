@@ -1,37 +1,48 @@
-"""El comando «resumir»: un resumen del documento, de 10 páginas como máximo.
+"""El comando «resumir»: un resumen del documento hecho con un modelo de IA.
 
-El resumen se construye a partir del contenido que ya se extrajo y se guardó
-en la ficha .md, así que no hace falta volver a abrir el documento (ni un PDF
-de 300 páginas).
+El modelo recibe el texto que ya se extrajo en el análisis (está en la ficha
+.md, así que no hay que volver a abrir el PDF) y devuelve un resumen
+organizado en Markdown. Ese Markdown se convierte en las secciones del
+documento final.
 
-Sale **sin imágenes** y con el texto organizado: títulos, apartados y tablas
-con tabuladores. Si el documento es largo, se recorta lo que sobra y se dice
-dónde se ha recortado, en vez de cortar por sorpresa.
+Si no hay modelo disponible —no hay clave, no hay red, el servidor falla— la
+CLI lo explica en una línea y genera la **versión extractiva**: las primeras
+líneas de cada apartado. No es lo mismo, pero es algo, y el documento dice
+claramente que se ha hecho sin IA.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from .documentos import Seccion, escribir_documento
-from .errores import DocumentoNoEncontrado
+from .errores import DocumentoNoEncontrado, ErrorIA
 from .ficha import Ficha
+from .markdown import a_secciones
 
-#: Máximo de líneas por sección del resumen.
+#: Máximo de líneas por apartado en la versión extractiva.
 MAXIMO_LINEAS_POR_SECCION = 25
 
-#: Máximo de secciones del resumen.
+#: Máximo de apartados en la versión extractiva.
 MAXIMO_SECCIONES = 12
 
-#: Caracteres máximos de contenido en el resumen.
-MAXIMO_CARACTERES = 30000
+#: Cuántos caracteres del documento se le envían al modelo.
+MAXIMO_CARACTERES = 12000
 
 #: Palabras que delatan un apartado de un documento de apuntes.
 MARCAS_DE_SECCION = (
     "índice", "indice", "contenido", "introducción", "introduccion", "resumen",
     "objetivos", "contenidos", "ejercicios", "actividades", "casos prácticos",
     "practica", "bibliografía", "bibliografia", "conclusiones", "anexos",
+)
+
+#: Las instrucciones que se le dan al modelo.
+SISTEMA = (
+    "Eres un profesor que prepara material de estudio para estudiantes de "
+    "informática. Escribes en español y en el idioma del documento original. "
+    "Respondes SOLO con el contenido pedido, en Markdown, sin comentarios "
+    "sobre lo que haces y sin rodeos. No escribas frases como «Aquí tienes...»: "
+    "empieza directamente por el contenido."
 )
 
 
@@ -77,15 +88,12 @@ def _detectar_apartados(texto: str) -> list[tuple[str, str]]:
     return apartados
 
 
-def _recortar(lineas: list[str], maximo: int) -> tuple[list[str], bool]:
-    """Recorta una lista de líneas y avisa si ha habido que cortar."""
-    if len(lineas) <= maximo:
-        return lineas, False
-    return lineas[:maximo], True
+def construir_secciones_extractivas(ficha: Ficha) -> list[Seccion]:
+    """La versión sin IA: las primeras líneas de cada apartado.
 
-
-def construir_secciones(ficha: Ficha) -> list[Seccion]:
-    """Las secciones del resumen, a partir del contenido de la ficha."""
+    Es una extracción, no un resumen. Se usa cuando no hay modelo, y el
+    documento avisa de ello.
+    """
     contenido = _limpiar(ficha.contenido)
     if not contenido:
         return [
@@ -100,11 +108,11 @@ def construir_secciones(ficha: Ficha) -> list[Seccion]:
 
     secciones: list[Seccion] = []
     recortado = False
-
     for titulo, cuerpo in apartados[:MAXIMO_SECCIONES]:
         lineas = [linea for linea in cuerpo.splitlines() if linea.strip()]
-        lineas, cortado = _recortar(lineas, MAXIMO_LINEAS_POR_SECCION)
-        recortado = recortado or cortado
+        if len(lineas) > MAXIMO_LINEAS_POR_SECCION:
+            lineas = lineas[:MAXIMO_LINEAS_POR_SECCION]
+            recortado = True
         secciones.append(Seccion(titulo.strip() or "Contenido", lineas))
 
     if len(apartados) > MAXIMO_SECCIONES:
@@ -115,9 +123,9 @@ def construir_secciones(ficha: Ficha) -> list[Seccion]:
             Seccion(
                 "Nota",
                 [
-                    "El documento es más largo de lo que cabe en un resumen de diez "
-                    "páginas, así que se ha recortado. El texto completo sigue en la "
-                    "ficha «md» del documento.",
+                    "Este resumen se ha hecho SIN inteligencia artificial, porque no "
+                    "había modelo disponible: es una extracción del principio de cada "
+                    "apartado, no un resumen de verdad.",
                 ],
             )
         )
@@ -125,17 +133,58 @@ def construir_secciones(ficha: Ficha) -> list[Seccion]:
     return secciones
 
 
-def resumen_de(ficha: Ficha) -> tuple[str, list[Seccion]]:
-    """El título y las secciones del resumen."""
-    titulo = f"Resumen · {ficha.nombre_original}"
-    return titulo, construir_secciones(ficha)
+def pedir_resumen(ficha: Ficha) -> list[Seccion]:
+    """Le pide al modelo un resumen y lo convierte en secciones."""
+    from .ia import pedir
+
+    contenido = ficha.contenido.strip()[:MAXIMO_CARACTERES]
+    if not contenido:
+        raise ErrorIA("el documento no tiene texto que resumir")
+
+    peticion = (
+        f"Resume este documento de apuntes.\n\n"
+        f"Reglas:\n"
+        f"- Un resumen de máximo 10 páginas, sin imágenes.\n"
+        f"- Empieza con un apartado «Ideas principales» con entre 5 y 10 puntos "
+        f"con los conceptos que de verdad hay que saberse.\n"
+        f"- Después, un apartado por cada tema del documento, con el contenido "
+        f"esencial y, si ayuda, una tabla.\n"
+        f"- Usa encabezados de segundo nivel (##) para los apartados.\n"
+        f"- No inventes nada: solo lo que esté en el texto.\n"
+        f"- Escribe en el idioma del documento.\n\n"
+        f"--- DOCUMENTO ---\n{contenido}"
+    )
+
+    respuesta = pedir(SISTEMA, peticion)
+    secciones = a_secciones(respuesta, titulo="Ideas principales")
+    if not secciones or not any(s.lineas for s in secciones):
+        raise ErrorIA("el modelo ha contestado pero sin contenido")
+    return secciones
+
+
+def construir_secciones(ficha: Ficha, con_ia: bool = True) -> tuple[list[Seccion], str]:
+    """Las secciones del resumen y una nota sobre cómo se han hecho."""
+    if con_ia:
+        try:
+            return pedir_resumen(ficha), "Generado con inteligencia artificial."
+        except ErrorIA as exc:
+            nota = f"Generado sin inteligencia artificial: {exc}"
+            return construir_secciones_extractivas(ficha), nota
+    return (
+        construir_secciones_extractivas(ficha),
+        "Generado sin inteligencia artificial: no hay modelo configurado.",
+    )
 
 
 def escribir_resumen(ficha: Ficha, carpeta: Path, formato: str = "") -> Path:
     """Escribe el fichero del resumen en la carpeta «resumenes»."""
-    titulo, secciones = resumen_de(ficha)
+    from .documentos import formato_preferido
+
+    secciones, nota = construir_secciones(ficha, con_ia=True)
+    titulo = f"Resumen · {ficha.nombre_original}"
+    secciones = [Seccion("", [nota], nivel=1), *secciones]
     destino = carpeta / "resumenes"
-    nombre = f"{_base(ficha.nombre_original)}_resumido{formato}"
+    nombre = f"{_base(ficha.nombre_original)}_resumido{formato or formato_preferido()}"
     return escribir_documento(destino / nombre, titulo, secciones)
 
 

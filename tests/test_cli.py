@@ -265,3 +265,39 @@ def test_ejecutar_una_accion_que_no_existe_da_codigo_1(tmp_path: Path) -> None:
     ruta = escribir_config(tmp_path)
     resultado = runner.invoke(app, ["--config", str(ruta), "ejecutar", "no-existe"])
     assert resultado.exit_code == 1
+
+
+# ------------------------------------------------- modo sin red
+
+
+def test_resumir_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -> None:
+    """Sin IA no se rompe: se explica y se hace el resumen extractivo."""
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "El SQL es un lenguaje de consulta\n" * 30)
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "resumir", "nota.txt", str(tmp_path / "Descargas")]
+    )
+
+    assert resultado.exit_code == 0
+    documentos = list((tmp_path / "Descargas" / "resumenes").iterdir())
+    assert len(documentos) == 1
+
+
+def test_evaluar_sin_modelo_avisa_y_hace_la_version_extractiva(tmp_path: Path) -> None:
+    ruta = escribir_config(tmp_path)
+    documento(tmp_path / "Descargas", "nota.txt", "El SQL se define como un lenguaje\n" * 30)
+
+    runner.invoke(
+        app, ["--config", str(ruta), "analizar", str(tmp_path / "Descargas")], input="y\n"
+    )
+    resultado = runner.invoke(
+        app, ["--config", str(ruta), "evaluar", "nota.txt", str(tmp_path / "Descargas")]
+    )
+
+    assert resultado.exit_code == 0
+    documentos = list((tmp_path / "Descargas" / "ejercicios").iterdir())
+    assert len(documentos) == 1

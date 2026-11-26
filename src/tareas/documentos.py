@@ -42,10 +42,32 @@ PREFERENCIAS = {
 
 @dataclass
 class Seccion:
-    """Un bloque del documento: un título y sus líneas."""
+    """Un bloque del documento: un título y sus líneas.
+
+    «nivel» es 1 para un apartado principal y 2 para uno de segundo nivel.
+    Las líneas pueden llevar marcas de negrita de Markdown (**así**), que los
+    escritores convierten en negrita de verdad.
+    """
 
     titulo: str
     lineas: list[str]
+    nivel: int = 1
+
+
+def partes_de(linea: str) -> list[tuple[str, bool]]:
+    """Parte una línea en trozos, diciendo cuáles van en negrita.
+
+    «Los **apuntes** de BBDD» ->
+    [('Los ', False), ('apuntes', True), (' de BBDD', False)]
+    """
+    if "**" not in linea:
+        return [(linea, False)]
+
+    partes: list[tuple[str, bool]] = []
+    for indice, trozo in enumerate(linea.split("**")):
+        if trozo:
+            partes.append((trozo, indice % 2 == 1))
+    return partes or [(linea, False)]
 
 
 def formato_preferido() -> str:
@@ -79,8 +101,10 @@ def _a_texto(titulo: str, secciones: list[Seccion]) -> str:
     """El documento en texto plano, con tabuladores para las tablas."""
     lineas = [titulo, "=" * len(titulo), ""]
     for seccion in secciones:
-        lineas.append(seccion.titulo)
-        lineas.append("-" * len(seccion.titulo))
+        if seccion.titulo:
+            sangria = "" if seccion.nivel <= 1 else "  "
+            lineas.append(f"{sangria}{seccion.titulo}")
+            lineas.append("-" * len(f"{sangria}{seccion.titulo}"))
         lineas.extend(seccion.lineas)
         lineas.append("")
     return "\n".join(lineas)
@@ -113,10 +137,17 @@ def _a_rtf(titulo: str, secciones: list[Seccion]) -> str:
         r"\par ",
     ]
     for seccion in secciones:
-        partes.append(r"{\b\fs26 " + _escapar_rtf(seccion.titulo) + r"\b0\par")
-        partes.append(r"\par ")
+        if seccion.titulo:
+            tamano = 26 if seccion.nivel <= 1 else 24
+            sangria = "" if seccion.nivel <= 1 else r"\li360 "
+            partes.append(sangria + r"{\b\fs" + str(tamano) + " " + _escapar_rtf(seccion.titulo) + r"\b0\par")
+            partes.append(r"\par ")
         for linea in seccion.lineas:
-            partes.append(_escapar_rtf(linea))
+            for texto, negrita in partes_de(linea):
+                if negrita:
+                    partes.append(r"{\b " + _escapar_rtf(texto) + r"\b0}")
+                else:
+                    partes.append(_escapar_rtf(texto))
             partes.append(r"\par ")
         partes.append(r"\par ")
     partes.append("}")
@@ -143,13 +174,32 @@ def _p_odt(texto: str, estilo: str = "Standard") -> str:
     )
 
 
+def _p_odt_rich(texto: str, sangria: bool = False) -> str:
+    """Un párrafo de OpenDocument con negritas dentro."""
+    trozos = partes_de(texto)
+    if not any(negrita for _, negrita in trozos):
+        return _p_odt(texto)
+
+    interior = "".join(
+        f'<text:span text:style-name="Negrita">{_xml_escapar(trozo)}</text:span>'
+        if negrita
+        else _xml_escapar(trozo)
+        for trozo, negrita in trozos
+    )
+    estilo = "Sangria" if sangria else "Standard"
+    return f'<text:p text:style-name="{estilo}">{interior}</text:p>' 
+
+
 def _a_content_xml(titulo: str, secciones: list[Seccion]) -> str:
     """El contenido del documento de OpenDocument."""
     cuerpo = [_p_odt(titulo, "Title")]
     for seccion in secciones:
-        cuerpo.append(_p_odt(seccion.titulo, "Heading_20_1"))
+        if seccion.titulo:
+            estilo = "Heading_20_1" if seccion.nivel <= 1 else "Heading_20_2"
+            cuerpo.append(_p_odt(seccion.titulo, estilo))
+        sangria = seccion.nivel > 1
         for linea in seccion.lineas:
-            cuerpo.append(_p_odt(linea))
+            cuerpo.append(_p_odt_rich(linea, sangria))
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<office:document-content '
@@ -179,6 +229,18 @@ _STYLES_ODT = (
     '<style:paragraph-properties fo:margin-top="0.3cm"/>'
     '<style:text-properties fo:font-size="14pt" fo:font-weight="bold" '
     'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"/>'
+    "</style:style>"
+    '<style:style style:name="Heading_20_2" style:family="paragraph">'
+    '<style:paragraph-properties fo:margin-top="0.2cm" fo:margin-left="0.4cm"/>'
+    '<style:text-properties fo:font-size="12pt" fo:font-weight="bold" '
+    'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"/>'
+    "</style:style>"
+    '<style:style style:name="Negrita" style:family="text">'
+    '<style:text-properties fo:font-weight="bold" '
+    'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"/>'
+    "</style:style>"
+    '<style:style style:name="Sangria" style:family="paragraph">'
+    '<style:paragraph-properties fo:margin-left="0.4cm"/>'
     "</style:style>"
     "</office:styles></office:document-styles>"
 )
@@ -220,6 +282,8 @@ def _p_docx(texto: str, estilo: str | None = None) -> str:
         formato = '<w:pPr><w:pStyle w:val="Title"/></w:pPr>'
     elif estilo == "Heading1":
         formato = '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+    elif estilo == "Heading2":
+        formato = '<w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
     return (
         "<w:p>"
         + formato
@@ -229,13 +293,33 @@ def _p_docx(texto: str, estilo: str | None = None) -> str:
     )
 
 
+def _p_docx_rich(texto: str, sangria: bool = False) -> str:
+    """Un párrafo de Word con negritas dentro."""
+    trozos = partes_de(texto)
+    if not any(negrita for _, negrita in trozos):
+        return _p_docx(texto)
+
+    formato = '<w:pPr><w:ind w:left="360"/></w:pPr>' if sangria else ""
+    interior = "".join(
+        "<w:r><w:rPr><w:b/></w:rPr>"
+        f'<w:t xml:space="preserve">{_xml_escapar(trozo)}</w:t></w:r>'
+        if negrita
+        else f'<w:r><w:t xml:space="preserve">{_xml_escapar(trozo)}</w:t></w:r>'
+        for trozo, negrita in trozos
+    )
+    return f"<w:p>{formato}{interior}</w:p>" 
+
+
 def _a_document_xml(titulo: str, secciones: list[Seccion]) -> str:
     """El contenido del documento de Word."""
     cuerpo = [_p_docx(titulo, "Title")]
     for seccion in secciones:
-        cuerpo.append(_p_docx(seccion.titulo, "Heading1"))
+        if seccion.titulo:
+            estilo = "Heading1" if seccion.nivel <= 1 else "Heading2"
+            cuerpo.append(_p_docx(seccion.titulo, estilo))
+        sangria = seccion.nivel > 1
         for linea in seccion.lineas:
-            cuerpo.append(_p_docx(linea))
+            cuerpo.append(_p_docx_rich(linea, sangria))
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
@@ -280,6 +364,9 @@ _STYLES_DOCX = (
     '<w:rPr><w:b/><w:sz w:val="40"/></w:rPr></w:style>'
     '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/>'
     '<w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/>'
+    '<w:pPr><w:ind w:left="360"/></w:pPr>'
+    '<w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>'
     "</w:styles>"
 )
 

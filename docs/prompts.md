@@ -497,6 +497,74 @@ sube al repo, y un modo sin red que avise de que estas dos órdenes no pueden
 completarse sin conexión. Se enchufará en el mismo sitio: la función que
 decide el contenido a partir del texto de la ficha.
 
+---
+
+## 2026-11-02 · La capa de IA: resumen y ejercicios de verdad
+
+**Petición:** «haz lo que tengas que hacer para que funcione con IA esos dos
+comandos».
+
+**Primero, averiguar con qué se puede hablar.** El `opencode.json` global ya
+tenía el proveedor del centro (`ia.simarro`), pero había dos problemas:
+
+1. **Python noconnects con el servidor del centro**: el tráfico pasa por un
+   proxy con su propio certificado (`ca-simarro.crt`), y Python no lo
+  .confía. La solución es una variable más: `TAREAS_IA_CA`, que apunta al
+   certificado.
+2. **No sabía el nombre real de los modelos**. Lo saqué de
+   `GET /llmapi/v1/models`: `Qwen38-DualSpark-low`, `-medium`, `-xhigh` y las
+   variantes `-Thinking-`.
+
+**Decisiones:**
+
+1. **Cliente propio, sin dependencias.** `ia.py` habla con la API usando
+   `urllib` de la biblioteca estándar. Ninguna dependencia nueva: el curso
+   pide que el proyecto sea sencillo de instalar y `requests` no vale la pena
+   para una llamada.
+2. **La clave fuera del repo, siempre.** Las variables de entorno mandan
+   sobre el `.env`, y el `.env` se busca en la carpeta de trabajo y en
+   `~/.config/tareas/`. Hay un `.env.example` con las cinco variables
+   documentadas y el `.env` está en el `.gitignore` desde el primer commit.
+3. **La IA es opcional, no obligatoria.** Si no hay clave, no hay red o el
+   servidor falla, se lanza `ErrorIA` con un mensaje de **una línea** y las
+   dos órdenes caen a la versión extractiva, dejando una nota en el documento
+   que dice que se ha hecho sin IA. Ninguna orden puede reventar por un
+   problema de red.
+4. **El modelo devuelve Markdown**, y `markdown.py` lo traduce a las
+   secciones del documento: encabezados de dos niveles, viñetas, tablas con
+   tabuladores y negritas de verdad en el `.odt` y el `.docx`.
+
+**El error que me costó tiempo:** al conectar la IA, **las pruebas empezaron a
+llamar a la red de verdad**. La suite tardaba dos minutos y gastaba créditos.
+Eso no puede ser: un `pytest` tiene que ser instantáneo y no puede depender
+de que haya red. Lo resolví con un fixture automático en `tests/conftest.py`
+que aparta la configuración de la IA, y las pruebas de la capa que sí
+necesitan el modelo simulan la llamada a `urlopen`.
+
+**Cómo quedó (probado con un PDF real de Sistemas Informáticos):**
+
+- El resumen son 3 páginas con «Ideas principales» (8 puntos con los conceptos
+  que hay que saberse), un apartado por tema y una **tabla** con la rúbrica de
+  corrección.
+- Los ejercicios son 6 preguntas de tipo test con **alternativas reales**
+  (no líneas de puntos), la respuesta correcta marcada, 3 preguntas de
+  desarrollo y las soluciones al final. Todo en el idioma del documento.
+- Tardan entre 1 y 4 minutos con los modelos del centro. Es lo que hay.
+
+**Qué aprendí:**
+
+- Un fallo que solo aparece en la red es el que más se esconde: la primera
+  versión de las pruebas «funcionaba» porque no había clave. En cuanto la
+  puse, la suite se fue a dos minutos. **Las pruebas que dependen del mundo
+  exterior hay que aislarlas siempre**, aunque no lo parezca.
+- El «modo sin red» no es un extra: es la diferencia entre una herramienta
+  que se rompe y una que te explica qué pasa. Y se implementa en un solo sitio:
+  el punto donde se llama al modelo.
+- Mandar el texto del documento a un modelo es una decisión de privacidad,
+  no un detalle técnico. Por eso la URL del servidor se configura, y por eso
+  hay una alternativa con Ollama en local que no manda nada fuera del
+  ordenador.
+
 
 
 
