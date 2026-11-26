@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .carpetas import Carpeta, cargar_carpetas
 from .errores import AccionNoValida, ConfigError
 
 #: Tipos de acción que el motor sabe ejecutar.
@@ -31,7 +33,10 @@ CLAVES_FILTRO = ("extensiones", "patron", "mas_antiguo_que_dias", "mayor_que_mb"
 
 #: Campos que se admiten en una acción. Lo que no esté aquí es un error:
 #: escribir «patron» fuera de «filtro» haría que la acción se aplicase a todo.
-CLAVES_ACCION = ("nombre", "descripcion", "tipo", "origen", "filtro", "destino", "plantilla", "confirmar")
+CLAVES_ACCION = (
+    "nombre", "descripcion", "tipo", "origen", "filtro", "destino",
+    "plantilla", "confirmar", "carpeta",
+)
 
 #: Huecos que la plantilla de renombrar puede usar.
 HUECOS_PLANTILLA = ("fecha", "n", "ext", "nombre")
@@ -49,6 +54,19 @@ NOMBRES_RESERVADOS = (
 #: Formato obligatorio del campo «nombre».
 RE_NOMBRE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
+#: Carpeta de descargas por defecto, si el fichero de acciones no dice otra cosa.
+DESCARGAS_POR_DEFECTO = "~/Downloads"
+
+
+@dataclass
+class Configuracion:
+    """Todo lo que se lee de un fichero de acciones.json."""
+
+    acciones: list[dict] = field(default_factory=list)
+    carpetas: list[Carpeta] = field(default_factory=list)
+    descargas: Path = field(default_factory=lambda: Path(DESCARGAS_POR_DEFECTO).expanduser())
+
+
 
 
 def cargar(ruta: Path) -> list[dict]:
@@ -58,6 +76,11 @@ def cargar(ruta: Path) -> list[dict]:
     o no cumple el esquema, y AccionNoValida concrete qué acción y campo
     están mal.
     """
+    return cargar_config(ruta).acciones
+
+
+def cargar_config(ruta: Path) -> Configuracion:
+    """Lee el fichero de acciones entero: acciones, carpetas y carpeta de descargas."""
     ruta = ruta.expanduser()
     if not ruta.is_file():
         raise ConfigError(
@@ -100,15 +123,39 @@ def cargar(ruta: Path) -> list[dict]:
     if not acciones:
         raise ConfigError(f"«{ruta.name}», campo «acciones»: la lista está vacía.")
 
+    carpetas = cargar_carpetas(datos) if "carpetas" in datos else []
+    por_clave = {c.clave: c for c in carpetas}
+
     validadas: list[dict] = []
     vistas: set[str] = set()
     for posicion, accion in enumerate(acciones, start=1):
-        validadas.append(_validar_accion(accion, posicion, vistas))
+        validadas.append(_validar_accion(accion, posicion, vistas, por_clave))
 
-    return validadas
+    descargas = _leer_descargas(datos)
+
+    return Configuracion(acciones=validadas, carpetas=carpetas, descargas=descargas)
 
 
-def _validar_accion(accion: object, posicion: int, vistas: set[str]) -> dict:
+def _leer_descargas(datos: dict) -> Path:
+    """De dónde salen los ficheros que hay que organizar."""
+    organizador = datos.get("organizador")
+    if organizador is None:
+        return Path(DESCARGAS_POR_DEFECTO).expanduser()
+    if not isinstance(organizador, dict):
+        raise ConfigError("campo «organizador»: debe ser un objeto")
+    descargas = organizador.get("descargas", DESCARGAS_POR_DEFECTO)
+    if not isinstance(descargas, str) or not descargas.strip():
+        raise ConfigError("campo «organizador.descargas»: debe ser una ruta (admite ~)")
+    return Path(descargas).expanduser()
+
+
+
+def _validar_accion(
+    accion: object,
+    posicion: int,
+    vistas: set[str],
+    por_clave: dict[str, Carpeta] | None = None,
+) -> dict:
     """Valida una acción suelta y devuelve el diccionario."""
     if not isinstance(accion, dict):
         raise AccionNoValida(f"nº {posicion}", "accion", "no es un objeto con campos")
@@ -152,6 +199,10 @@ def _validar_accion(accion: object, posicion: int, vistas: set[str]) -> dict:
     if "origen" in accion and not isinstance(accion["origen"], str):
         raise AccionNoValida(nombre, "origen", "debe ser una ruta (admite ~)")
 
+    # Una acción puede apuntar a una carpeta y heredar su destino y sus
+    # patrones: así la asignatura se escribe una sola vez.
+    accion = _heredar_de_carpeta(nombre, accion, por_clave or {})
+
     extra = POR_TIPO.get(tipo)
     if extra and not accion.get(extra):
         raise AccionNoValida(nombre, extra, f"es obligatorio en acciones de tipo {tipo}")
@@ -172,6 +223,40 @@ def _validar_accion(accion: object, posicion: int, vistas: set[str]) -> dict:
     _validar_filtro(nombre, accion.get("filtro"))
 
     return accion
+
+
+def _heredar_de_carpeta(nombre: str, accion: dict, por_clave: dict[str, Carpeta]) -> dict:
+    """Si la acción apunta a una carpeta, hereda su destino y sus patrones."""
+    clave = accion.get("carpeta")
+    if clave is None:
+        return accion
+
+    if not isinstance(clave, str) or not clave.strip():
+        raise AccionNoValida(nombre, "carpeta", "tiene que ser el nombre de una carpeta")
+
+    carpeta = por_clave.get(clave)
+    if carpeta is None:
+        raise AccionNoValida(
+            nombre,
+            "carpeta",
+            f"«{clave}» no está en la lista «carpetas» del fichero de acciones",
+        )
+
+    heredada = dict(accion)
+
+    if not heredada.get("destino"):
+        heredada["destino"] = str(carpeta.destino)
+
+    filtro = dict(heredada.get("filtro") or {})
+    if not filtro.get("patron"):
+        # La clave siempre cuenta como patrón: un fichero que ya empieza por
+        # «bbdd_» es interpretable aunque el resto no diga nada.
+        alternativas = [carpeta.clave, *carpeta.patrones]
+        filtro["patron"] = "(?:" + "|".join(alternativas) + ")"
+    heredada["filtro"] = filtro
+
+    return heredada
+
 
 
 def _validar_plantilla(nombre: str, plantilla: object) -> None:

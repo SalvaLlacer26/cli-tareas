@@ -5,67 +5,61 @@
       "nombre": "apuntes-bases-dades",
       "descripcion": "Mueve los apuntes de Bases de Datos a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
+      "carpeta": "bbdd",
       "origen": "~/Baixades",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".odb", ".md", ".txt"],
-        "patron": "(sql|bbdd|mysql|mariadb|entitats|atributs|clau|relacional|esquema|biblioteca|model e-r)"
-      },
-      "destino": "~/Documents/Bases de dades"
+        "extensiones": [".pdf", ".docx", ".odp", ".odb", ".md", ".txt"]
+      }
     },
     {
       "nombre": "apuntes-entorns",
       "descripcion": "Mueve los apuntes de Entornos de Desarrollo a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
+      "carpeta": "entorns",
       "origen": "~/Baixades",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(git|github|entorns|desenvolup|docker|versionat|repositori)"
-      },
-      "destino": "~/Documents/Entorns de desenrotllament"
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"]
+      }
     },
     {
       "nombre": "apuntes-marcs",
       "descripcion": "Mueve los apuntes de Lenguaje de Marcas a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
+      "carpeta": "marcs",
       "origen": "~/Baixades",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(html|css|xml|figma|marques|màrqu|disseny|web)"
-      },
-      "destino": "~/Documents/Llenguatge_de_marques"
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"]
+      }
     },
     {
       "nombre": "apuntes-programacio",
       "descripcion": "Mueve los apuntes de Programación a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
+      "carpeta": "programacio",
       "origen": "~/Baixades",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(python|java|programa|algorit|pseudocodi|funcions|bucles|llistes|c\\+\\+)"
-      },
-      "destino": "~/Documents/Programació"
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"]
+      }
     },
     {
       "nombre": "apuntes-intermodular",
       "descripcion": "Mueve los apuntes del Proyecto Intermodular a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
+      "carpeta": "intermodular",
       "origen": "~/Baixades",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(intermodular|projecte)"
-      },
-      "destino": "~/Documents/Projecte intermodular"
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"]
+      }
     },
     {
       "nombre": "apuntes-sistemes",
       "descripcion": "Mueve los apuntes de Sistemas Informáticos a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
+      "carpeta": "sistemes",
       "origen": "~/Baixades",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(linux|ubuntu|sistem|redes|maquinari|windows|virtualiz|servid|hardware)"
-      },
-      "destino": "~/Documents/Sistemes informàtics"
+        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"]
+      }
     },
     {
       "nombre": "separar-instaladores",
@@ -118,5 +112,73 @@
       },
       "destino": "~/Documents/Copia"
     }
-  ]
+  ],
+  "carpetas": [
+    {
+      "clave": "bbdd",
+      "etiqueta": "Bases de dades",
+      "destino": "~/Documents/Bases de dades",
+      "patrones": [
+        "sql", "bbdd", "bases de dades", "mysql", "mariadb", "entitats",
+        "atributs", "clau", "relacional", "esquema", "biblioteca", "model e-r",
+        "sistemes gestors", "s-g-s"
+      ]
+    },
+    {
+      "clave": "entorns",
+      "etiqueta": "Entorns de desenrotllament",
+      "destino": "~/Documents/Entorns de desenrotllament",
+      "patrones": [
+        "git", "github", "entorns", "desenvolupament", "docker", "versionat",
+        "repositori", "commit", "branch", "merge", "ide"
+      ]
+    },
+    {
+      "clave": "marcs",
+      "etiqueta": "Llenguatge de marques",
+      "destino": "~/Documents/Llenguatge_de_marques",
+      "patrones": [
+        "html", "css", "xml", "xsd", "xsl", "figma", "llenguatge de marques",
+        "màrqu", "disseny", "web", "etiqueta", "dhtml"
+      ]
+    },
+    {
+      "clave": "programacio",
+      "etiqueta": "Programació",
+      "destino": "~/Documents/Programació",
+      "patrones": [
+        "python", "java", "programació", "programacio", "algoritme", "pseudocodi",
+        "funcions", "bucles", "llistes", "variables", "eclipse", "netbeans"
+      ]
+    },
+    {
+      "clave": "intermodular",
+      "etiqueta": "Projecte intermodular",
+      "destino": "~/Documents/Projecte intermodular",
+      "patrones": [
+        "intermodular", "projecte intermodular", "1daw", "fork", "rúbrica",
+        "rubrica", "treball en equip"
+      ]
+    },
+    {
+      "clave": "sistemes",
+      "etiqueta": "Sistemes informàtics",
+      "destino": "~/Documents/Sistemes informàtics",
+      "patrones": [
+        "sistemes", "sistemes informàtics", "sistemes informatics", "linux",
+        "ubuntu", "xarxes", "redes", "maquinari", "windows", "virtualització",
+        "servidors", "hardware", "numeració", "sistemes de numeració"
+      ]
+    },
+    {
+      "clave": "sin-clasificar",
+      "etiqueta": "Sin clasificar",
+      "destino": "~/Documents/Sin clasificar",
+      "patrones": [],
+      "respaldo": true
+    }
+  ],
+  "organizador": {
+    "descargas": "~/Baixades"
+  }
 }

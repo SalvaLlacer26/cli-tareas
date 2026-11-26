@@ -5,95 +5,144 @@
       "nombre": "apuntes-bases-dades",
       "descripcion": "Mueve los apuntes de Bases de Datos a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "carpeta": "bbdd",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".odb", ".md", ".txt"],
-        "patron": "(sql|bbdd|mysql|mariadb|entitats|atributs|clau|relacional|esquema|biblioteca|model e-r)"
-      },
-      "destino": "~/pruebas-tareas/Documents/Bases de dades"
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp",
+          ".odb",
+          ".md",
+          ".txt"
+        ]
+      }
     },
     {
       "nombre": "apuntes-entorns",
       "descripcion": "Mueve los apuntes de Entornos de Desarrollo a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "carpeta": "entorns",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(git|github|entorns|desenvolup|docker|versionat|repositori)"
-      },
-      "destino": "~/pruebas-tareas/Documents/Entorns de desenrotllament"
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp",
+          ".md",
+          ".txt"
+        ]
+      }
     },
     {
       "nombre": "apuntes-marcs",
       "descripcion": "Mueve los apuntes de Lenguaje de Marcas a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "carpeta": "marcs",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(html|css|xml|figma|marques|màrqu|disseny|web)"
-      },
-      "destino": "~/pruebas-tareas/Documents/Llenguatge_de_marques"
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp",
+          ".md",
+          ".txt"
+        ]
+      }
     },
     {
       "nombre": "apuntes-programacio",
       "descripcion": "Mueve los apuntes de Programación a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "carpeta": "programacio",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(python|java|programa|algorit|pseudocodi|funcions|bucles|llistes|c\\+\\+)"
-      },
-      "destino": "~/pruebas-tareas/Documents/Programació"
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp",
+          ".md",
+          ".txt"
+        ]
+      }
     },
     {
       "nombre": "apuntes-intermodular",
       "descripcion": "Mueve los apuntes del Proyecto Intermodular a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "carpeta": "intermodular",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(intermodular|projecte)"
-      },
-      "destino": "~/pruebas-tareas/Documents/Projecte intermodular"
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp",
+          ".md",
+          ".txt"
+        ]
+      }
     },
     {
       "nombre": "apuntes-sistemes",
       "descripcion": "Mueve los apuntes de Sistemas Informáticos a su carpeta, reconociendo la asignatura por el nombre del fichero.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "carpeta": "sistemes",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp", ".md", ".txt"],
-        "patron": "(linux|ubuntu|sistem|redes|maquinari|windows|virtualiz|servid|hardware)"
-      },
-      "destino": "~/pruebas-tareas/Documents/Sistemes informàtics"
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp",
+          ".md",
+          ".txt"
+        ]
+      }
     },
     {
       "nombre": "separar-instaladores",
       "descripcion": "Aparta los instaladores de paquetes (.deb, .rpm, .exe…) a una subcarpeta para no estorbar en Descargas.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".deb", ".rpm", ".exe", ".msi", ".appimage"]
+        "extensiones": [
+          ".deb",
+          ".rpm",
+          ".exe",
+          ".msi",
+          ".appimage"
+        ]
       },
-      "destino": "~/pruebas-tareas/Descargas/Instaladores"
+      "destino": "/home/salllaiva/pruebas-tareas/Descargas/Instaladores"
     },
     {
       "nombre": "separar-comprimidos",
       "descripcion": "Aparta los ficheros comprimidos (.zip, .tar.xz…) a una subcarpeta para no estorbar en Descargas.",
       "tipo": "mover",
-      "origen": "~/pruebas-tareas/Descargas",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".zip", ".tar.gz", ".tar.xz", ".7z", ".rar"]
+        "extensiones": [
+          ".zip",
+          ".tar.gz",
+          ".tar.xz",
+          ".7z",
+          ".rar"
+        ]
       },
-      "destino": "~/pruebas-tareas/Descargas/Comprimidos"
+      "destino": "/home/salllaiva/pruebas-tareas/Descargas/Comprimidos"
     },
     {
       "nombre": "renombrar-capturas",
       "descripcion": "Renombra las capturas de pantalla y fotos con su fecha: 2026-10-27_001.png.",
       "tipo": "renombrar",
-      "origen": "~/pruebas-tareas/Imatges",
+      "origen": "/home/salllaiva/pruebas-tareas/Imatges",
       "filtro": {
-        "extensiones": [".png", ".jpg", ".jpeg", ".gif", ".webp"]
+        "extensiones": [
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".gif",
+          ".webp"
+        ]
       },
       "plantilla": "{fecha:%Y-%m-%d}_{n:03}{ext}"
     },
@@ -101,9 +150,11 @@
       "nombre": "limpiar-temporales",
       "descripcion": "Borra los ficheros temporales (.tmp) de Descargas que llevan más de 30 días sin tocarse.",
       "tipo": "borrar",
-      "origen": "~/pruebas-tareas/Descargas",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".tmp"],
+        "extensiones": [
+          ".tmp"
+        ],
         "mas_antiguo_que_dias": 30
       },
       "confirmar": true
@@ -112,11 +163,139 @@
       "nombre": "copiar-copia-apuntes",
       "descripcion": "Copia los apuntes de Descargas a una carpeta de copia de seguridad, sin tocar el original.",
       "tipo": "copiar",
-      "origen": "~/pruebas-tareas/Descargas",
+      "origen": "/home/salllaiva/pruebas-tareas/Descargas",
       "filtro": {
-        "extensiones": [".pdf", ".docx", ".odp"]
+        "extensiones": [
+          ".pdf",
+          ".docx",
+          ".odp"
+        ]
       },
-      "destino": "~/pruebas-tareas/Documents/Copia"
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Copia"
     }
-  ]
+  ],
+  "carpetas": [
+    {
+      "clave": "bbdd",
+      "etiqueta": "Bases de dades",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Bases de dades",
+      "patrones": [
+        "sql",
+        "bbdd",
+        "bases de dades",
+        "mysql",
+        "mariadb",
+        "entitats",
+        "atributs",
+        "clau",
+        "relacional",
+        "esquema",
+        "biblioteca",
+        "model e-r",
+        "sistemes gestors",
+        "s-g-s"
+      ]
+    },
+    {
+      "clave": "entorns",
+      "etiqueta": "Entorns de desenrotllament",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Entorns de desenrotllament",
+      "patrones": [
+        "git",
+        "github",
+        "entorns",
+        "desenvolupament",
+        "docker",
+        "versionat",
+        "repositori",
+        "commit",
+        "branch",
+        "merge",
+        "ide"
+      ]
+    },
+    {
+      "clave": "marcs",
+      "etiqueta": "Llenguatge de marques",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Llenguatge_de_marques",
+      "patrones": [
+        "html",
+        "css",
+        "xml",
+        "xsd",
+        "xsl",
+        "figma",
+        "llenguatge de marques",
+        "màrqu",
+        "disseny",
+        "web",
+        "etiqueta",
+        "dhtml"
+      ]
+    },
+    {
+      "clave": "programacio",
+      "etiqueta": "Programació",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Programació",
+      "patrones": [
+        "python",
+        "java",
+        "programació",
+        "programacio",
+        "algoritme",
+        "pseudocodi",
+        "funcions",
+        "bucles",
+        "llistes",
+        "variables",
+        "eclipse",
+        "netbeans"
+      ]
+    },
+    {
+      "clave": "intermodular",
+      "etiqueta": "Projecte intermodular",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Projecte intermodular",
+      "patrones": [
+        "intermodular",
+        "projecte intermodular",
+        "1daw",
+        "fork",
+        "rúbrica",
+        "rubrica",
+        "treball en equip"
+      ]
+    },
+    {
+      "clave": "sistemes",
+      "etiqueta": "Sistemes informàtics",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Sistemes informàtics",
+      "patrones": [
+        "sistemes",
+        "sistemes informàtics",
+        "sistemes informatics",
+        "linux",
+        "ubuntu",
+        "xarxes",
+        "redes",
+        "maquinari",
+        "windows",
+        "virtualització",
+        "servidors",
+        "hardware",
+        "numeració",
+        "sistemes de numeració"
+      ]
+    },
+    {
+      "clave": "sin-clasificar",
+      "etiqueta": "Sin clasificar",
+      "destino": "/home/salllaiva/pruebas-tareas/Documents/Sin clasificar",
+      "patrones": [],
+      "respaldo": true
+    }
+  ],
+  "organizador": {
+    "descargas": "/home/salllaiva/pruebas-tareas/Descargas"
+  }
 }
